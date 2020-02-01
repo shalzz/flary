@@ -5,6 +5,9 @@ authors = ["Shaleen Jain <shaleen@jain.sh>"]
 edition = "2018"
 description = "A CLI for managing Domains and DNS records on cloudflare."
 license = "MIT OR Apache-2.0"
+repository = "https://github.com/shalzz/flary"
+readme = "README.md"
+categories = ["command-line-interface"]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
