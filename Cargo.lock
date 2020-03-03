@@ -427,16 +427,17 @@ dependencies = [
 name = "flary"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "clap",
  "cloudflare",
  "config",
  "crossterm",
  "dirs 1.0.5",
  "env_logger",
- "failure",
  "log 0.4.8",
  "serde 1.0.104",
  "serde_json",
+ "tempfile",
  "toml",
 ]
 
