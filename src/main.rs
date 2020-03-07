@@ -4,7 +4,6 @@ extern crate clap;
 use flary::settings;
 
 use clap::{App, Arg, SubCommand};
-use cloudflare::framework::async_api::Client;
 use cloudflare::framework::auth::Credentials;
 use cloudflare::framework::{Environment, HttpApiClientConfig};
 
@@ -81,12 +80,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("Value for config: {}", config);
 
     let user = settings::global_user::GlobalUser::new()?;
-
     let client = Client::new(
         Credentials::from(user),
         HttpApiClientConfig::default(),
         Environment::Production,
-    )?;
+    )
+    .unwrap(); // TODO convert from fallible to error
 
     Ok(())
 }
