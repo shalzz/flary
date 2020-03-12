@@ -13,6 +13,8 @@ categories = ["command-line-interface"]
 
 [dependencies]
 anyhow = "1.0.26"
+async-std = "1.5.0"
+async-trait = "0.1.24"
 config = "0.10.1"
 cloudflare = "0.6.4"
 clap = "2.33.0"

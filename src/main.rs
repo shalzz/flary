@@ -1,14 +1,22 @@
 #[macro_use]
 extern crate clap;
 
+use flary::commands;
 use flary::settings;
 
+use anyhow::Result;
+use async_std::task;
 use clap::{App, Arg, SubCommand};
+use cloudflare::framework::async_api::Client;
 use cloudflare::framework::auth::Credentials;
 use cloudflare::framework::{Environment, HttpApiClientConfig};
 
-fn main() -> Result<(), Box<dyn std::error::Error>> {
+fn main() -> Result<()> {
     env_logger::init();
+    Ok(task::block_on(run())?)
+}
+
+async fn run() -> Result<()> {
     let matches = App::new(crate_name!())
         .version(crate_version!())
         .author(crate_authors!())
@@ -80,6 +88,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("Value for config: {}", config);
 
     let user = settings::global_user::GlobalUser::new()?;
+    println!("{:?}", &user);
     let client = Client::new(
         Credentials::from(user),
         HttpApiClientConfig::default(),
@@ -87,5 +96,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     )
     .unwrap(); // TODO convert from fallible to error
 
+    commands::dns::list(&client).await?;
     Ok(())
 }
