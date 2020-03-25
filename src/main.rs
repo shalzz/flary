@@ -5,18 +5,14 @@ use flary::commands;
 use flary::settings;
 
 use anyhow::Result;
-use async_std::task;
 use clap::{App, Arg, SubCommand};
 use cloudflare::framework::async_api::Client;
 use cloudflare::framework::auth::Credentials;
 use cloudflare::framework::{Environment, HttpApiClientConfig};
 
-fn main() -> Result<()> {
+#[tokio::main]
+async fn main() -> Result<()> {
     env_logger::init();
-    Ok(task::block_on(run())?)
-}
-
-async fn run() -> Result<()> {
     let matches = App::new(crate_name!())
         .version(crate_version!())
         .author(crate_authors!())
