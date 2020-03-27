@@ -6,6 +6,13 @@ const MAX_NAMESPACES_PER_PAGE: u32 = 100;
 const PAGE_NUMBER: u32 = 1;
 
 pub async fn list(client: &impl ApiClient, name: Option<String>) -> Result<()> {
+    for zone in call_api(client, name).await? {
+        println!("{}", &zone.name);
+    }
+    Ok(())
+}
+
+pub async fn call_api(client: &impl ApiClient, name: Option<String>) -> Result<Vec<Zone>> {
     let params = ListZonesParams {
         name,
         direction: None,
@@ -17,9 +24,5 @@ pub async fn list(client: &impl ApiClient, name: Option<String>) -> Result<()> {
     };
 
     let result: Vec<Zone> = client.request(&ListZones { params }).await?.result;
-
-    for zone in result {
-        println!("{}", &zone.name);
-    }
-    Ok(())
+    Ok(result)
 }

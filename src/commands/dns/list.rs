@@ -1,28 +1,22 @@
+use crate::commands;
+
 use anyhow::Result;
 use cloudflare::endpoints::dns::{DnsRecord, ListDnsRecords, ListDnsRecordsParams};
 use cloudflare::framework::async_api::ApiClient;
-use cloudflare::framework::response::{ApiFailure, ApiSuccess};
 
 const MAX_NAMESPACES_PER_PAGE: u32 = 100;
 const PAGE_NUMBER: u32 = 1;
 
 pub async fn list(client: &impl ApiClient, name: &str) -> Result<()> {
-    let result = call_api(client, name).await;
-
-    match result {
-        Ok(success) => {
-            let records = success.result;
-            println!("{:?}", &records);
-        }
-        Err(e) => println!("{:?}", e),
+    for record in call_api(client, name).await? {
+        println!("{:?}", &record);
     }
     Ok(())
 }
 
-pub async fn call_api(
-    client: &impl ApiClient,
-    name: &str,
-) -> Result<ApiSuccess<Vec<DnsRecord>>, ApiFailure> {
+pub async fn call_api(client: &impl ApiClient, name: &str) -> Result<Vec<DnsRecord>> {
+    let zones = commands::domains::list::call_api(client, Some(name.to_owned())).await?;
+
     let params = ListDnsRecordsParams {
         name: Some(name.to_owned()),
         direction: None,
@@ -33,10 +27,12 @@ pub async fn call_api(
         per_page: Some(MAX_NAMESPACES_PER_PAGE),
     };
 
-    client
+    let result: Vec<DnsRecord> = client
         .request(&ListDnsRecords {
-            zone_identifier: "",
+            zone_identifier: &zones[0].id,
             params,
         })
-        .await
+        .await?
+        .result;
+    Ok(result)
 }
