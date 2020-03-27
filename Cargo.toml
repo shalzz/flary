@@ -14,7 +14,7 @@ categories = ["command-line-interface"]
 [dependencies]
 anyhow = "1.0.26"
 config = "0.10.1"
-cloudflare = "0.6.4"
+cloudflare = { git = "https://github.com/shalzz/cloudflare-rs.git" }
 clap = "2.33.0"
 crossterm = "0.14.1"
 dirs = "1.0.5"

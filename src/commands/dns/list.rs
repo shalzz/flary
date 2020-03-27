@@ -6,8 +6,8 @@ use cloudflare::framework::response::{ApiFailure, ApiSuccess};
 const MAX_NAMESPACES_PER_PAGE: u32 = 100;
 const PAGE_NUMBER: u32 = 1;
 
-pub async fn list(client: &impl ApiClient) -> Result<()> {
-    let result = call_api(client).await;
+pub async fn list(client: &impl ApiClient, name: &str) -> Result<()> {
+    let result = call_api(client, name).await;
 
     match result {
         Ok(success) => {
@@ -19,9 +19,12 @@ pub async fn list(client: &impl ApiClient) -> Result<()> {
     Ok(())
 }
 
-pub async fn call_api(client: &impl ApiClient) -> Result<ApiSuccess<Vec<DnsRecord>>, ApiFailure> {
+pub async fn call_api(
+    client: &impl ApiClient,
+    name: &str,
+) -> Result<ApiSuccess<Vec<DnsRecord>>, ApiFailure> {
     let params = ListDnsRecordsParams {
-        name: None,
+        name: Some(name.to_owned()),
         direction: None,
         order: None,
         record_type: None,

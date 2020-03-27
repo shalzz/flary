@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 #[macro_use]
 extern crate clap;
 
@@ -13,10 +14,11 @@ use cloudflare::framework::{Environment, HttpApiClientConfig};
 #[tokio::main]
 async fn main() -> Result<()> {
     env_logger::init();
-    let matches = App::new(crate_name!())
+    let app = App::new(crate_name!())
         .version(crate_version!())
         .author(crate_authors!())
         .about(crate_description!())
+        /*
         .arg(
             Arg::with_name("config")
                 .short("c")
@@ -25,6 +27,7 @@ async fn main() -> Result<()> {
                 .help("Sets a custom config file")
                 .takes_value(true),
         )
+        */
         .subcommand(
             SubCommand::with_name("domains")
                 .alias("domain")
@@ -80,18 +83,42 @@ async fn main() -> Result<()> {
         )
         .get_matches();
 
-    let config = matches.value_of("config").unwrap_or("default.conf");
-    println!("Value for config: {}", config);
+    match app.subcommand() {
+        ("domains", Some(subs)) => {
+            let user = settings::global_user::GlobalUser::new()?;
+            let client = Client::new(
+                Credentials::from(user),
+                HttpApiClientConfig::default(),
+                Environment::Production,
+            )
+            .unwrap(); // TODO convert from fallible to error
 
-    let user = settings::global_user::GlobalUser::new()?;
-    println!("{:?}", &user);
-    let client = Client::new(
-        Credentials::from(user),
-        HttpApiClientConfig::default(),
-        Environment::Production,
-    )
-    .unwrap(); // TODO convert from fallible to error
+            match subs.subcommand_name() {
+                Some("ls") => commands::domains::list(&client, None).await?,
+                Some("inspect") => println!("domains inspect"),
+                _ => (),
+            }
+        }
+        ("dns", Some(subs)) => {
+            let user = settings::global_user::GlobalUser::new()?;
+            let client = Client::new(
+                Credentials::from(user),
+                HttpApiClientConfig::default(),
+                Environment::Production,
+            )
+            .unwrap(); // TODO convert from fallible to error
 
-    commands::dns::list(&client).await?;
+            match subs.subcommand() {
+                ("ls", Some(args)) => {
+                    commands::dns::list(&client, args.value_of("name").unwrap()).await?
+                }
+                ("add", Some(args)) => println!("dns add"),
+                ("rm", Some(args)) => println!("dns rm"),
+                _ => (),
+            }
+        }
+        _ => (),
+    }
+
     Ok(())
 }
