@@ -1,6 +1,6 @@
 [package]
 name = "flary"
-version = "0.1.0"
+version = "0.1.1"
 authors = ["Shaleen Jain <shaleen@jain.sh>"]
 edition = "2018"
 description = "A CLI for managing Domains and DNS records on cloudflare."
@@ -16,7 +16,7 @@ anyhow = "1.0.26"
 config = "0.10.1"
 clap = "2.33.0"
 crossterm = "0.14.1"
-cloudflare = "0.6.4"
+cloudflare-rs = "0.6.6"
 dirs = "1.0.5"
 env_logger = "0.6.1"
 log = "0.4.6"
@@ -27,4 +27,4 @@ toml = "0.5.5"
 tokio = { version = "^0.2", features = ["full"] }
 
 [patch.crates-io]
-cloudflare = { git = "https://github.com/shalzz/cloudflare-rs.git" }
+cloudflare-rs = { git = "https://github.com/shalzz/cloudflare-rs.git" }
