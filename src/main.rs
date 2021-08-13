@@ -5,15 +5,16 @@ extern crate clap;
 use flary::commands;
 use flary::settings;
 
-use anyhow::Result;
 use clap::{App, Arg, SubCommand};
 use cloudflare::framework::async_api::Client;
 use cloudflare::framework::auth::Credentials;
-use cloudflare::framework::{Environment, HttpApiClientConfig};
+use cloudflare::framework::Environment;
+use cloudflare::surf::Result;
 
 #[tokio::main]
 async fn main() -> Result<()> {
     env_logger::init();
+
     let app = App::new(crate_name!())
         .version(crate_version!())
         .author(crate_authors!())
@@ -86,12 +87,7 @@ async fn main() -> Result<()> {
     match app.subcommand() {
         ("domains", Some(subs)) => {
             let user = settings::global_user::GlobalUser::new()?;
-            let client = Client::new(
-                Credentials::from(user),
-                HttpApiClientConfig::default(),
-                Environment::Production,
-            )
-            .unwrap(); // TODO convert from fallible to error
+            let client = Client::new(Credentials::from(user), Environment::Production)?;
 
             match subs.subcommand_name() {
                 Some("ls") => commands::domains::list(&client, None).await?,
@@ -101,12 +97,7 @@ async fn main() -> Result<()> {
         }
         ("dns", Some(subs)) => {
             let user = settings::global_user::GlobalUser::new()?;
-            let client = Client::new(
-                Credentials::from(user),
-                HttpApiClientConfig::default(),
-                Environment::Production,
-            )
-            .unwrap(); // TODO convert from fallible to error
+            let client = Client::new(Credentials::from(user), Environment::Production)?;
 
             match subs.subcommand() {
                 ("ls", Some(args)) => {
