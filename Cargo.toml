@@ -27,4 +27,4 @@ toml = "0.5.5"
 tokio = { version = "^0.2", features = ["full"] }
 
 [patch.crates-io]
-cloudflare-rs = { path = "../cloudflare-rs/cloudflare" }
+cloudflare-rs = { git = "https://github.com/shalzz/cloudflare-rs.git" }
