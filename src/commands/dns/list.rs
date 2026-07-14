@@ -6,8 +6,8 @@ use cloudflare::framework::client::async_api::Client;
 const MAX_NAMESPACES_PER_PAGE: u32 = 100;
 const PAGE_NUMBER: u32 = 1;
 
-pub async fn list(client: &Client, name: &str) -> anyhow::Result<()> {
-    for record in call_api(client, name).await? {
+pub fn print_records(records: &[DnsRecord]) {
+    for record in records {
         let record_type = format!("{:?}", record.content);
         let record_type = record_type.split('{').next().unwrap_or(&record_type);
         println!(
@@ -18,10 +18,14 @@ pub async fn list(client: &Client, name: &str) -> anyhow::Result<()> {
             dns_content_to_string(&record.content),
         );
     }
+}
+
+pub async fn list(client: &Client, name: &str) -> anyhow::Result<()> {
+    print_records(&call_api(client, name).await?);
     Ok(())
 }
 
-fn dns_content_to_string(content: &DnsContent) -> String {
+pub fn dns_content_to_string(content: &DnsContent) -> String {
     match content {
         DnsContent::A { content } => content.to_string(),
         DnsContent::AAAA { content } => content.to_string(),

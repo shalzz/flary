@@ -139,12 +139,21 @@ async fn main() -> anyhow::Result<()> {
 
             match app.subcommand() {
                 ("domains", Some(subs)) => match subs.subcommand_name() {
-                    Some("ls") => commands::domains::list(&client, None).await,
+                    Some("ls") => {
+                        let zones = flary::spinner::with_spinner("Fetching domains", commands::domains::list::call_api(&client, None)).await?;
+                        for zone in &zones {
+                            println!("{}", &zone.name);
+                        }
+                        Ok(())
+                    }
                     _ => Ok(()),
                 },
                 ("dns", Some(subs)) => match subs.subcommand() {
                     ("ls", Some(args)) => {
-                        commands::dns::list(&client, args.value_of("name").unwrap()).await
+                        let name = args.value_of("name").unwrap();
+                        let records = flary::spinner::with_spinner("Fetching DNS records", commands::dns::list::call_api(&client, name)).await?;
+                        commands::dns::list::print_records(&records);
+                        Ok(())
                     }
                     ("add", Some(args)) => {
                         let domain = args.value_of("domain").unwrap();
@@ -157,7 +166,7 @@ async fn main() -> anyhow::Result<()> {
                             .value_of("priority")
                             .and_then(|p| p.parse().ok());
 
-                        commands::dns::add(
+                        let record = flary::spinner::with_spinner("Adding DNS record", commands::dns::add::call_api(
                             &client,
                             domain,
                             name,
@@ -166,8 +175,13 @@ async fn main() -> anyhow::Result<()> {
                             proxied,
                             ttl,
                             priority,
-                        )
-                        .await
+                        )).await?;
+
+                        println!(
+                            "Created DNS record: {} {} {} (ID: {})",
+                            record.name, record_type, value, record.id,
+                        );
+                        Ok(())
                     }
                     ("update", Some(args)) => {
                         let id = args.value_of("id").unwrap();
@@ -178,10 +192,15 @@ async fn main() -> anyhow::Result<()> {
                         let proxied = args.is_present("proxied");
                         let ttl: u32 = args.value_of("ttl").unwrap().parse().unwrap_or(1);
 
-                        commands::dns::update(
+                        let record = flary::spinner::with_spinner("Updating DNS record", commands::dns::update::call_api(
                             &client, id, domain, name, record_type, value, proxied, ttl,
-                        )
-                        .await
+                        )).await?;
+
+                        println!(
+                            "Updated DNS record: {} {} {} (ID: {})",
+                            record.name, record_type, value, record.id,
+                        );
+                        Ok(())
                     }
                     ("rm", Some(args)) => {
                         let id = args.value_of("id").unwrap();

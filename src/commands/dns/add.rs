@@ -2,13 +2,13 @@ use std::net::Ipv4Addr;
 use std::str::FromStr;
 
 use cloudflare::endpoints::dns::dns::{
-    CreateDnsRecord, CreateDnsRecordParams, DnsContent,
+    CreateDnsRecord, CreateDnsRecordParams, DnsContent, DnsRecord,
 };
 use cloudflare::framework::client::async_api::Client;
 
 use crate::commands;
 
-pub async fn add(
+pub async fn call_api(
     client: &Client,
     domain: &str,
     name: &str,
@@ -17,7 +17,7 @@ pub async fn add(
     proxied: bool,
     ttl: u32,
     priority: Option<u16>,
-) -> anyhow::Result<()> {
+) -> anyhow::Result<DnsRecord> {
     let zones = commands::domains::list::call_api(client, Some(domain.to_owned())).await?;
 
     if zones.is_empty() {
@@ -35,13 +35,26 @@ pub async fn add(
         content,
     };
 
-    let record = client
+    Ok(client
         .request(&CreateDnsRecord {
             zone_identifier: zone_id,
             params,
         })
         .await?
-        .result;
+        .result)
+}
+
+pub async fn add(
+    client: &Client,
+    domain: &str,
+    name: &str,
+    record_type: &str,
+    value: &str,
+    proxied: bool,
+    ttl: u32,
+    priority: Option<u16>,
+) -> anyhow::Result<()> {
+    let record = call_api(client, domain, name, record_type, value, proxied, ttl, priority).await?;
 
     println!(
         "Created DNS record: {} {} {} (ID: {})",

@@ -1,9 +1,9 @@
-use cloudflare::endpoints::dns::dns::{UpdateDnsRecord, UpdateDnsRecordParams};
+use cloudflare::endpoints::dns::dns::{DnsRecord, UpdateDnsRecord, UpdateDnsRecordParams};
 use cloudflare::framework::client::async_api::Client;
 
 use crate::commands;
 
-pub async fn update(
+pub async fn call_api(
     client: &Client,
     id: &str,
     domain: &str,
@@ -12,7 +12,7 @@ pub async fn update(
     value: &str,
     proxied: bool,
     ttl: u32,
-) -> anyhow::Result<()> {
+) -> anyhow::Result<DnsRecord> {
     let zones = commands::domains::list::call_api(client, Some(domain.to_owned())).await?;
 
     if zones.is_empty() {
@@ -29,14 +29,27 @@ pub async fn update(
         content,
     };
 
-    let record = client
+    Ok(client
         .request(&UpdateDnsRecord {
             zone_identifier: zone_id,
             identifier: id,
             params,
         })
         .await?
-        .result;
+        .result)
+}
+
+pub async fn update(
+    client: &Client,
+    id: &str,
+    domain: &str,
+    name: &str,
+    record_type: &str,
+    value: &str,
+    proxied: bool,
+    ttl: u32,
+) -> anyhow::Result<()> {
+    let record = call_api(client, id, domain, name, record_type, value, proxied, ttl).await?;
 
     println!(
         "Updated DNS record: {} {} {} (ID: {})",

@@ -3,3 +3,4 @@ extern crate anyhow;
 
 pub mod commands;
 pub mod settings;
+pub mod spinner;

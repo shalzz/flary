@@ -1,6 +1,6 @@
 [package]
 name = "flary"
-version = "0.1.1"
+version = "1.0.0"
 authors = ["Shaleen Jain <shaleen@jain.sh>"]
 edition = "2018"
 description = "A CLI for managing Domains and DNS records on cloudflare."
@@ -28,6 +28,7 @@ tempfile = "3.1.0"
 toml = "0.5.5"
 tokio = { version = "1", features = ["full"] }
 urlencoding = "2"
+nanospinner = "0.3.2"
 
 [dev-dependencies]
 tempfile = "3.1.0"
