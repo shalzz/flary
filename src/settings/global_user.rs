@@ -351,4 +351,52 @@ oauth_token = "my-oauth-token-123"
 
         Ok(tmp_config_path)
     }
+
+    #[test]
+    fn it_converts_global_key_auth_to_credentials() {
+        let user = GlobalUser::GlobalKeyAuth {
+            email: "user@example.com".to_string(),
+            api_key: "my-api-key".to_string(),
+        };
+        let creds: Credentials = user.into();
+        match creds {
+            Credentials::UserAuthKey { key, email } => {
+                assert_eq!(key, "my-api-key");
+                assert_eq!(email, "user@example.com");
+            }
+            _ => panic!("Expected UserAuthKey"),
+        }
+    }
+
+    #[test]
+    fn it_roundtrips_to_file_and_back() {
+        let user = GlobalUser::TokenAuth {
+            api_token: "roundtrip-token".to_string(),
+        };
+
+        let tmp_dir = tempdir().unwrap();
+        let config_path = tmp_dir.path().join("test.toml");
+
+        user.to_file(&config_path).unwrap();
+        let loaded = GlobalUser::from_file(config_path).unwrap();
+
+        assert_eq!(user, loaded);
+    }
+
+    #[test]
+    fn it_roundtrips_global_key_auth_to_file_matches_format() {
+        let user = GlobalUser::GlobalKeyAuth {
+            email: "test@example.com".to_string(),
+            api_key: "test-key-123".to_string(),
+        };
+
+        let tmp_dir = tempdir().unwrap();
+        let config_path = tmp_dir.path().join("test.toml");
+
+        user.to_file(&config_path).unwrap();
+
+        let content = fs::read_to_string(&config_path).unwrap();
+        assert!(content.contains("test@example.com"));
+        assert!(content.contains("test-key-123"));
+    }
 }

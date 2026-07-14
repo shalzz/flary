@@ -90,3 +90,148 @@ pub fn parse_dns_content(
         ),
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parse_a_record() {
+        let result = parse_dns_content("A", "1.2.3.4", None).unwrap();
+        match result {
+            DnsContent::A { content } => assert_eq!(content, "1.2.3.4".parse::<Ipv4Addr>().unwrap()),
+            _ => panic!("Expected A record"),
+        }
+    }
+
+    #[test]
+    fn parse_a_record_case_insensitive() {
+        let result = parse_dns_content("a", "10.0.0.1", None).unwrap();
+        match result {
+            DnsContent::A { content } => assert_eq!(content, "10.0.0.1".parse::<Ipv4Addr>().unwrap()),
+            _ => panic!("Expected A record"),
+        }
+    }
+
+    #[test]
+    fn parse_a_record_invalid_ip() {
+        assert!(parse_dns_content("A", "not-an-ip", None).is_err());
+    }
+
+    #[test]
+    fn parse_a_record_partial_ip() {
+        assert!(parse_dns_content("A", "1.2.3", None).is_err());
+    }
+
+    #[test]
+    fn parse_aaaa_record() {
+        let result = parse_dns_content("AAAA", "::1", None).unwrap();
+        match result {
+            DnsContent::AAAA { content } => {
+                assert_eq!(content, "::1".parse::<std::net::Ipv6Addr>().unwrap())
+            }
+            _ => panic!("Expected AAAA record"),
+        }
+    }
+
+    #[test]
+    fn parse_aaaa_record_full() {
+        let result = parse_dns_content("AAAA", "2001:0db8:85a3:0000:0000:8a2e:0370:7334", None)
+            .unwrap();
+        match result {
+            DnsContent::AAAA { content } => assert_eq!(
+                content,
+                "2001:0db8:85a3:0000:0000:8a2e:0370:7334"
+                    .parse::<std::net::Ipv6Addr>()
+                    .unwrap()
+            ),
+            _ => panic!("Expected AAAA record"),
+        }
+    }
+
+    #[test]
+    fn parse_aaaa_record_invalid() {
+        assert!(parse_dns_content("AAAA", "not-ipv6", None).is_err());
+    }
+
+    #[test]
+    fn parse_cname_record() {
+        let result = parse_dns_content("CNAME", "example.com", None).unwrap();
+        match result {
+            DnsContent::CNAME { content } => assert_eq!(content, "example.com"),
+            _ => panic!("Expected CNAME record"),
+        }
+    }
+
+    #[test]
+    fn parse_ns_record() {
+        let result = parse_dns_content("NS", "ns1.example.com", None).unwrap();
+        match result {
+            DnsContent::NS { content } => assert_eq!(content, "ns1.example.com"),
+            _ => panic!("Expected NS record"),
+        }
+    }
+
+    #[test]
+    fn parse_mx_record_with_priority() {
+        let result = parse_dns_content("MX", "mail.example.com", Some(10)).unwrap();
+        match result {
+            DnsContent::MX { content, priority } => {
+                assert_eq!(content, "mail.example.com");
+                assert_eq!(priority, 10);
+            }
+            _ => panic!("Expected MX record"),
+        }
+    }
+
+    #[test]
+    fn parse_mx_record_without_priority() {
+        let result = parse_dns_content("MX", "mail.example.com", None).unwrap();
+        match result {
+            DnsContent::MX { content, priority } => {
+                assert_eq!(content, "mail.example.com");
+                assert_eq!(priority, 0);
+            }
+            _ => panic!("Expected MX record"),
+        }
+    }
+
+    #[test]
+    fn parse_txt_record() {
+        let result = parse_dns_content("TXT", "v=spf1 include:_spf.google.com ~all", None).unwrap();
+        match result {
+            DnsContent::TXT { content } => {
+                assert_eq!(content, "v=spf1 include:_spf.google.com ~all")
+            }
+            _ => panic!("Expected TXT record"),
+        }
+    }
+
+    #[test]
+    fn parse_srv_record() {
+        let result = parse_dns_content("SRV", "10 0 5060 sip.example.com", None).unwrap();
+        match result {
+            DnsContent::SRV { content } => assert_eq!(content, "10 0 5060 sip.example.com"),
+            _ => panic!("Expected SRV record"),
+        }
+    }
+
+    #[test]
+    fn parse_unsupported_type() {
+        let err = parse_dns_content("PTR", "1.2.3.4", None).unwrap_err();
+        assert!(err.to_string().contains("Unsupported record type"));
+    }
+
+    #[test]
+    fn parse_unsupported_type_caa() {
+        assert!(parse_dns_content("CAA", "0 issue \"letsencrypt.org\"", None).is_err());
+    }
+
+    #[test]
+    fn parse_case_insensitive_types() {
+        assert!(parse_dns_content("a", "1.2.3.4", None).is_ok());
+        assert!(parse_dns_content("AaAa", "::1", None).is_ok());
+        assert!(parse_dns_content("cname", "example.com", None).is_ok());
+        assert!(parse_dns_content("Mx", "mail.example.com", None).is_ok());
+    }
+}

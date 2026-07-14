@@ -9,8 +9,6 @@ repository = "https://github.com/shalzz/flary"
 readme = "README.md"
 categories = ["command-line-interface"]
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
 [dependencies]
 anyhow = "1.0.26"
 config = "0.10.1"
@@ -20,6 +18,10 @@ dirs = "1.0.5"
 env_logger = "0.6.1"
 log = "0.4.6"
 serde = { version = "1.0", features = ["derive"] }
-tempfile = "3.1.0"
 toml = "0.5.5"
 tokio = { version = "1", features = ["full"] }
+
+[dev-dependencies]
+tempfile = "3.1.0"
+wiremock = "0.6"
+serde_json = "1.0"
