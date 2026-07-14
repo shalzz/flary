@@ -6,18 +6,24 @@ use cloudflare::framework::client::async_api::Client;
 const MAX_NAMESPACES_PER_PAGE: u32 = 100;
 const PAGE_NUMBER: u32 = 1;
 
-pub fn print_records(records: &[DnsRecord]) {
+pub fn print_records_to_writer(records: &[DnsRecord], writer: &mut dyn std::io::Write) -> std::io::Result<()> {
     for record in records {
         let record_type = format!("{:?}", record.content);
         let record_type = record_type.split('{').next().unwrap_or(&record_type);
-        println!(
+        writeln!(
+            writer,
             "{:<10} {:<24} {:<8} {}",
             record.id,
             record.name,
             record_type,
             dns_content_to_string(&record.content),
-        );
+        )?;
     }
+    Ok(())
+}
+
+pub fn print_records(records: &[DnsRecord]) {
+    let _ = print_records_to_writer(records, &mut std::io::stdout());
 }
 
 pub async fn list(client: &Client, name: &str) -> anyhow::Result<()> {
@@ -127,5 +133,109 @@ mod tests {
             content: "10 0 5060 sip.example.com".to_string(),
         };
         assert_eq!(dns_content_to_string(&content), "10 0 5060 sip.example.com");
+    }
+
+    fn a_record(id: &str, name: &str, ip: &str) -> DnsRecord {
+        serde_json::from_value(serde_json::json!({
+            "id": id,
+            "name": name,
+            "ttl": 1,
+            "proxied": false,
+            "proxiable": true,
+            "created_on": "2024-01-01T00:00:00Z",
+            "modified_on": "2024-01-01T00:00:00Z",
+            "meta": {},
+            "type": "A",
+            "content": ip,
+        })).unwrap()
+    }
+
+    fn cname_record(id: &str, name: &str, target: &str) -> DnsRecord {
+        serde_json::from_value(serde_json::json!({
+            "id": id,
+            "name": name,
+            "ttl": 1,
+            "proxied": false,
+            "proxiable": true,
+            "created_on": "2024-01-01T00:00:00Z",
+            "modified_on": "2024-01-01T00:00:00Z",
+            "meta": {},
+            "type": "CNAME",
+            "content": target,
+        })).unwrap()
+    }
+
+    fn mx_record(id: &str, name: &str, target: &str, priority: u16) -> DnsRecord {
+        serde_json::from_value(serde_json::json!({
+            "id": id,
+            "name": name,
+            "ttl": 1,
+            "proxied": false,
+            "proxiable": true,
+            "created_on": "2024-01-01T00:00:00Z",
+            "modified_on": "2024-01-01T00:00:00Z",
+            "meta": {},
+            "type": "MX",
+            "content": target,
+            "priority": priority,
+        })).unwrap()
+    }
+
+    #[test]
+    fn print_records_single_a() {
+        let records = vec![a_record("rec123", "www.example.com", "1.2.3.4")];
+        let mut buf = Vec::new();
+        print_records_to_writer(&records, &mut buf).unwrap();
+        let output = String::from_utf8(buf).unwrap();
+        assert_eq!(output, "rec123     www.example.com          A        1.2.3.4\n");
+    }
+
+    #[test]
+    fn print_records_multiple_types() {
+        let records = vec![
+            a_record("rec_a", "example.com", "192.168.1.1"),
+            cname_record("rec_cname", "www.example.com", "example.com"),
+        ];
+        let mut buf = Vec::new();
+        print_records_to_writer(&records, &mut buf).unwrap();
+        let output = String::from_utf8(buf).unwrap();
+        assert_eq!(
+            output,
+            "rec_a      example.com              A        192.168.1.1\n\
+             rec_cname  www.example.com          CNAME    example.com\n"
+        );
+    }
+
+    #[test]
+    fn print_records_mx() {
+        let records = vec![mx_record("rec_mx", "example.com", "mail.example.com", 10)];
+        let mut buf = Vec::new();
+        print_records_to_writer(&records, &mut buf).unwrap();
+        let output = String::from_utf8(buf).unwrap();
+        assert_eq!(
+            output,
+            "rec_mx     example.com              MX       10 mail.example.com\n"
+        );
+    }
+
+    #[test]
+    fn print_records_empty() {
+        let records = vec![];
+        let mut buf = Vec::new();
+        print_records_to_writer(&records, &mut buf).unwrap();
+        let output = String::from_utf8(buf).unwrap();
+        assert_eq!(output, "");
+    }
+
+    #[test]
+    fn print_records_long_values() {
+        let records = vec![a_record("rec-with-long-id-12345", "a-very-long-subdomain-name.example.com", "255.255.255.255")];
+        let mut buf = Vec::new();
+        print_records_to_writer(&records, &mut buf).unwrap();
+        let output = String::from_utf8(buf).unwrap();
+        assert_eq!(
+            output,
+            "rec-with-long-id-12345 a-very-long-subdomain-name.example.com A        255.255.255.255\n"
+        );
     }
 }
