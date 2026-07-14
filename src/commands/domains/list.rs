@@ -1,18 +1,18 @@
-use cloudflare::endpoints::zone::{ListZones, ListZonesParams, Status, Zone};
-use cloudflare::framework::async_api::AsyncApiClient;
-use cloudflare::surf::Result;
+use cloudflare::endpoints::zones::zone::{ListZones, ListZonesParams, Status, Zone};
+use cloudflare::framework::client::async_api::Client;
+use cloudflare::framework::response::ApiFailure;
 
 const MAX_NAMESPACES_PER_PAGE: u32 = 100;
 const PAGE_NUMBER: u32 = 1;
 
-pub async fn list(client: &impl AsyncApiClient, name: Option<String>) -> Result<()> {
+pub async fn list(client: &Client, name: Option<String>) -> anyhow::Result<()> {
     for zone in call_api(client, name).await? {
         println!("{}", &zone.name);
     }
     Ok(())
 }
 
-pub async fn call_api(client: &impl AsyncApiClient, name: Option<String>) -> Result<Vec<Zone>> {
+pub async fn call_api(client: &Client, name: Option<String>) -> Result<Vec<Zone>, ApiFailure> {
     let params = ListZonesParams {
         name,
         direction: None,
@@ -23,5 +23,8 @@ pub async fn call_api(client: &impl AsyncApiClient, name: Option<String>) -> Res
         status: Some(Status::Active),
     };
 
-    client.request(&ListZones { params }).await
+    client
+        .request(&ListZones { params })
+        .await
+        .map(|r| r.result)
 }
