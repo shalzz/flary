@@ -41,7 +41,7 @@ pub async fn call_api(client: &Client, name: &str) -> anyhow::Result<Vec<DnsReco
     }
 
     let params = ListDnsRecordsParams {
-        name: Some(name.to_owned()),
+        name: None,
         direction: None,
         order: None,
         record_type: None,
