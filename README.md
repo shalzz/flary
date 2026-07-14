@@ -198,4 +198,4 @@ RUST_LOG=debug cargo run -- domains ls
 
 ## License
 
-MIT OR Apache-2.0
+GPL 2.0
