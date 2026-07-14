@@ -3,7 +3,6 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use cloudflare::framework::auth::Credentials;
-use config;
 use serde::{Deserialize, Serialize};
 
 use crate::settings::{Environment, QueryEnvironment};
@@ -27,6 +26,14 @@ pub enum GlobalUser {
     GlobalKeyAuth { email: String, api_key: String },
 }
 
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Default)]
+struct WranglerConfig {
+    oauth_token: Option<String>,
+    api_token: Option<String>,
+    refresh_token: Option<String>,
+    expiration_time: Option<String>,
+}
+
 impl GlobalUser {
     pub fn new() -> Result<Self> {
         let environment = Environment::with_whitelist(ENV_VAR_WHITELIST.to_vec());
@@ -41,6 +48,8 @@ impl GlobalUser {
     {
         if let Some(user) = Self::from_env(environment) {
             user
+        } else if let Some(user) = Self::from_local_wrangler() {
+            user
         } else {
             Self::from_file(config_path)
         }
@@ -50,9 +59,6 @@ impl GlobalUser {
     where
         T: config::Source + Send + Sync,
     {
-        // if there's some problem with gathering the environment,
-        // or if there are no relevant environment variables set,
-        // fall back to config file.
         if environment.empty().unwrap_or(true) {
             None
         } else {
@@ -63,29 +69,69 @@ impl GlobalUser {
         }
     }
 
+    fn from_local_wrangler() -> Option<Result<Self>> {
+        let local_config = Path::new("wrangler.toml");
+        if !local_config.exists() {
+            return None;
+        }
+
+        log::info!("Found local wrangler.toml, reading OAuth token");
+        match Self::from_wrangler_file(local_config) {
+            Ok(user) => Some(Ok(user)),
+            Err(e) => {
+                log::info!("Failed to read local wrangler.toml: {}", e);
+                None
+            }
+        }
+    }
+
     fn from_file(config_path: PathBuf) -> Result<Self> {
-        let mut s = config::Config::new();
-
-        let config_str = config_path
-            .to_str()
-            .expect("global config path should be a string");
-
-        // Skip reading global config if non existent
-        // because envs might be provided
-        if config_path.exists() {
-            log::info!(
-                "Config path exists. Reading from config file, {}",
-                config_str
-            );
-            s.merge(config::File::with_name(config_str))?;
-        } else {
-            anyhow!(
+        if !config_path.exists() {
+            anyhow::bail!(
                 "config path does not exist {}. Try running `wrangler config`",
-                config_str
+                config_path.display()
             );
         }
 
-        GlobalUser::from_config(s)
+        log::info!(
+            "Config path exists. Reading from config file, {}",
+            config_path.display()
+        );
+
+        Self::from_wrangler_file(&config_path)
+    }
+
+    fn from_wrangler_file(path: &Path) -> Result<Self> {
+        let content = fs::read_to_string(path)?;
+        Self::parse_wrangler_content(&content)
+    }
+
+    fn parse_wrangler_content(content: &str) -> Result<Self> {
+        let config: WranglerConfig = toml::from_str(content)
+            .map_err(|e| anyhow::anyhow!("Failed to parse wrangler config: {}", e))?;
+
+        // Prefer api_token (set via CLOUDFLARE_API_TOKEN or stored as such)
+        if let Some(api_token) = config.api_token {
+            if !api_token.trim().is_empty() {
+                log::info!("Using api_token from wrangler config");
+                return Ok(GlobalUser::TokenAuth { api_token });
+            }
+        }
+
+        // Fall back to oauth_token (from wrangler login)
+        if let Some(oauth_token) = config.oauth_token {
+            if !oauth_token.trim().is_empty() {
+                log::info!("Using oauth_token from wrangler config");
+                return Ok(GlobalUser::TokenAuth {
+                    api_token: oauth_token,
+                });
+            }
+        }
+
+        anyhow::bail!(
+            "No valid token found in wrangler config. \
+             Expected `api_token` or `oauth_token` field."
+        )
     }
 
     pub fn to_file(&self, config_path: &Path) -> Result<()> {
@@ -148,10 +194,6 @@ mod tests {
 
     #[test]
     fn it_can_prioritize_token_input() {
-        // Set all CF_API_TOKEN, CF_EMAIL, and CF_API_KEY.
-        // This test evaluates whether the GlobalUser returned is
-        // a GlobalUser::TokenAuth (expected behavior; token
-        // should be prioritized over email + global API key pair.)
         let mut mock_env = MockEnvironment::default();
         mock_env.set(CF_API_TOKEN, "foo");
         mock_env.set(CF_EMAIL, "test@cloudflare.com");
@@ -212,7 +254,7 @@ mod tests {
     }
 
     #[test]
-    fn it_fails_if_global_auth_incomplete_in_file() {
+    fn it_fails_if_no_token_in_file() {
         let tmp_dir = tempdir().unwrap();
         let config_dir = test_config_dir(&tmp_dir, None).unwrap();
 
@@ -220,8 +262,8 @@ mod tests {
             .write(true)
             .open(&config_dir.as_path())
             .unwrap();
-        let email_config = "email = \"thisisanemail\"";
-        file.write_all(email_config.as_bytes()).unwrap();
+        let toml_content = "refresh_token = \"some-refresh-token\"\nexpiration_time = \"2099-01-01T00:00:00Z\"\n";
+        file.write_all(toml_content.as_bytes()).unwrap();
 
         let file_user = GlobalUser::from_file(config_dir);
 
@@ -251,6 +293,52 @@ mod tests {
         let new_user = GlobalUser::build(mock_env, dummy_path);
 
         assert!(new_user.is_ok());
+    }
+
+    #[test]
+    fn it_parses_oauth_token_from_wrangler_config() {
+        let content = r#"
+oauth_token = "my-oauth-token-123"
+refresh_token = "some-refresh-token"
+expiration_time = "2099-01-01T00:00:00Z"
+scopes = ["account:read"]
+"#;
+
+        let user = GlobalUser::parse_wrangler_content(content).unwrap();
+        assert_eq!(
+            user,
+            GlobalUser::TokenAuth {
+                api_token: "my-oauth-token-123".to_string()
+            }
+        );
+    }
+
+    #[test]
+    fn it_prefers_api_token_over_oauth_token() {
+        let content = r#"
+api_token = "my-api-token-456"
+oauth_token = "my-oauth-token-123"
+"#;
+
+        let user = GlobalUser::parse_wrangler_content(content).unwrap();
+        assert_eq!(
+            user,
+            GlobalUser::TokenAuth {
+                api_token: "my-api-token-456".to_string()
+            }
+        );
+    }
+
+    #[test]
+    fn it_converts_token_auth_to_credentials() {
+        let user = GlobalUser::TokenAuth {
+            api_token: "test-token".to_string(),
+        };
+        let creds: Credentials = user.into();
+        assert_eq!(
+            creds.headers(),
+            vec![("Authorization", "Bearer test-token".to_string())]
+        );
     }
 
     fn test_config_dir(tmp_dir: &tempfile::TempDir, user: Option<GlobalUser>) -> Result<PathBuf> {
