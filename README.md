@@ -22,33 +22,59 @@ cd flary
 cargo install --path .
 ```
 
-## Configuration
+## Authentication
 
-flary authenticates with the Cloudflare API using credentials stored in your Wrangler config file (`~/.wrangler/config/default.toml`) or via environment variables.
+flary reads credentials from the following sources, in order of priority:
+
+1. **Environment variables** (highest priority)
+2. **Local `wrangler.toml`** in the current directory
+3. **Global wrangler config** at `~/.wrangler/config/default.toml`
 
 ### Environment variables
 
-| Variable      | Description                        |
-|---------------|------------------------------------|
-| `CF_API_TOKEN`| Cloudflare API token               |
-| `CF_API_KEY`  | Cloudflare API key (global)        |
-| `CF_EMAIL`    | Cloudflare account email (required with `CF_API_KEY`) |
+| Variable | Description |
+|---|---|
+| `CF_API_TOKEN` | Cloudflare API token (preferred) |
+| `CF_API_KEY` | Global API key (requires `CF_EMAIL`) |
+| `CF_EMAIL` | Account email address |
 
-Environment variables take priority over the config file. You can also set `WRANGLER_HOME` to override the default config directory (`~/.wrangler`).
+### Wrangler config
 
-### Config file
+flary reads `api_token` or `oauth_token` from wrangler's config files, preferring `api_token` when both are present. The global config path can be overridden with `WRANGLER_HOME`.
 
-Run `wrangler login` or create `~/.wrangler/config/default.toml` manually:
-
-```toml
-api_token = "your-cloudflare-api-token"
-```
-
-OAuth tokens from `wrangler login` are also supported:
+Example wrangler config:
 
 ```toml
 oauth_token = "your-oauth-token"
+refresh_token = "your-refresh-token"
+expiration_time = "2026-01-01T00:00:00Z"
+scopes = ["zone:read", "dns_records:read", "dns_records:edit"]
 ```
+
+### OAuth login
+
+If you don't have a token, use the built-in OAuth flow:
+
+```sh
+flary config auth
+```
+
+This opens a browser for Cloudflare consent with DNS read/write scopes (`zone:read`, `dns_records:read`, `dns_records:edit`). After authorizing, the token is saved to `~/.wrangler/config/default.toml` and is compatible with wrangler.
+
+## Commands
+
+```
+flary config auth                  # Authenticate via OAuth
+flary domains ls                   # List all domains
+flary dns ls <domain>              # List DNS records for a domain
+flary dns add <domain> <name> <type> <value> [--proxied] [--ttl N] [--priority N]
+flary dns update <id> <domain> <name> <type> <value> [--proxied] [--ttl N]
+flary dns rm <id> <domain> [--yes]
+```
+
+### DNS record types
+
+A, AAAA, CNAME, TXT, MX, SRV, NS
 
 ## Usage
 
@@ -156,18 +182,6 @@ Skip confirmation:
 ```bash
 flary dns rm abc123 example.com --yes
 ```
-
-## Supported record types
-
-| Type   | Description                     |
-|--------|---------------------------------|
-| `A`    | IPv4 address                    |
-| `AAAA` | IPv6 address                    |
-| `CNAME`| Canonical name (alias)          |
-| `MX`   | Mail exchange                   |
-| `NS`   | Name server                     |
-| `SRV`  | Service locator                 |
-| `TXT`  | Text record                     |
 
 ## Development
 

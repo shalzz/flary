@@ -19,6 +19,14 @@ async fn main() -> anyhow::Result<()> {
         .author(crate_authors!())
         .about(crate_description!())
         .subcommand(
+            SubCommand::with_name("config")
+                .about("Configure flary settings")
+                .subcommands(vec![
+                    SubCommand::with_name("auth")
+                        .about("Re-authorize the wrangler OAuth token with DNS permissions"),
+                ]),
+        )
+        .subcommand(
             SubCommand::with_name("domains")
                 .alias("domain")
                 .about("Manage your domain names")
@@ -116,66 +124,76 @@ async fn main() -> anyhow::Result<()> {
         )
         .get_matches();
 
-    let user = settings::global_user::GlobalUser::new()?;
-    let client = Client::new(
-        Credentials::from(user),
-        ClientConfig::default(),
-        Environment::Production,
-    )?;
-
     match app.subcommand() {
-        ("domains", Some(subs)) => match subs.subcommand_name() {
-            Some("ls") => commands::domains::list(&client, None).await,
+        ("config", Some(subs)) => match subs.subcommand_name() {
+            Some("auth") => commands::config::auth::auth().await,
             _ => Ok(()),
         },
-        ("dns", Some(subs)) => match subs.subcommand() {
-            ("ls", Some(args)) => {
-                commands::dns::list(&client, args.value_of("name").unwrap()).await
-            }
-            ("add", Some(args)) => {
-                let domain = args.value_of("domain").unwrap();
-                let name = args.value_of("name").unwrap();
-                let record_type = args.value_of("type").unwrap();
-                let value = args.value_of("value").unwrap();
-                let proxied = args.is_present("proxied");
-                let ttl: u32 = args.value_of("ttl").unwrap().parse().unwrap_or(1);
-                let priority: Option<u16> = args
-                    .value_of("priority")
-                    .and_then(|p| p.parse().ok());
+        _ => {
+            let user = settings::global_user::GlobalUser::new()?;
+            let client = Client::new(
+                Credentials::from(user),
+                ClientConfig::default(),
+                Environment::Production,
+            )?;
 
-                commands::dns::add(
-                    &client,
-                    domain,
-                    name,
-                    record_type,
-                    value,
-                    proxied,
-                    ttl,
-                    priority,
-                )
-                .await
-            }
-            ("update", Some(args)) => {
-                let id = args.value_of("id").unwrap();
-                let domain = args.value_of("domain").unwrap();
-                let name = args.value_of("name").unwrap();
-                let record_type = args.value_of("type").unwrap();
-                let value = args.value_of("value").unwrap();
-                let proxied = args.is_present("proxied");
-                let ttl: u32 = args.value_of("ttl").unwrap().parse().unwrap_or(1);
+            match app.subcommand() {
+                ("domains", Some(subs)) => match subs.subcommand_name() {
+                    Some("ls") => commands::domains::list(&client, None).await,
+                    _ => Ok(()),
+                },
+                ("dns", Some(subs)) => match subs.subcommand() {
+                    ("ls", Some(args)) => {
+                        commands::dns::list(&client, args.value_of("name").unwrap()).await
+                    }
+                    ("add", Some(args)) => {
+                        let domain = args.value_of("domain").unwrap();
+                        let name = args.value_of("name").unwrap();
+                        let record_type = args.value_of("type").unwrap();
+                        let value = args.value_of("value").unwrap();
+                        let proxied = args.is_present("proxied");
+                        let ttl: u32 = args.value_of("ttl").unwrap().parse().unwrap_or(1);
+                        let priority: Option<u16> = args
+                            .value_of("priority")
+                            .and_then(|p| p.parse().ok());
 
-                commands::dns::update(&client, id, domain, name, record_type, value, proxied, ttl)
-                    .await
-            }
-            ("rm", Some(args)) => {
-                let id = args.value_of("id").unwrap();
-                let domain = args.value_of("domain").unwrap();
-                let yes = args.is_present("yes");
+                        commands::dns::add(
+                            &client,
+                            domain,
+                            name,
+                            record_type,
+                            value,
+                            proxied,
+                            ttl,
+                            priority,
+                        )
+                        .await
+                    }
+                    ("update", Some(args)) => {
+                        let id = args.value_of("id").unwrap();
+                        let domain = args.value_of("domain").unwrap();
+                        let name = args.value_of("name").unwrap();
+                        let record_type = args.value_of("type").unwrap();
+                        let value = args.value_of("value").unwrap();
+                        let proxied = args.is_present("proxied");
+                        let ttl: u32 = args.value_of("ttl").unwrap().parse().unwrap_or(1);
 
-                commands::dns::rm(&client, id, domain, yes).await
+                        commands::dns::update(
+                            &client, id, domain, name, record_type, value, proxied, ttl,
+                        )
+                        .await
+                    }
+                    ("rm", Some(args)) => {
+                        let id = args.value_of("id").unwrap();
+                        let domain = args.value_of("domain").unwrap();
+                        let yes = args.is_present("yes");
+
+                        commands::dns::rm(&client, id, domain, yes).await
+                    }
+                    _ => Ok(()),
+                },
+                _ => Ok(()),
             }
-            _ => Ok(()),
-        },
-        _ => Ok(()),
+        }
     }
 }
