@@ -27,11 +27,38 @@ pub enum GlobalUser {
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Default)]
-struct WranglerConfig {
-    oauth_token: Option<String>,
-    api_token: Option<String>,
-    refresh_token: Option<String>,
-    expiration_time: Option<String>,
+pub struct WranglerConfig {
+    pub oauth_token: Option<String>,
+    pub api_token: Option<String>,
+    pub refresh_token: Option<String>,
+    pub expiration_time: Option<String>,
+    pub scopes: Option<Vec<String>>,
+}
+
+impl WranglerConfig {
+    pub fn read_from_file(path: &Path) -> Option<Self> {
+        if !path.exists() {
+            return None;
+        }
+        let content = fs::read_to_string(path).ok()?;
+        toml::from_str(&content).ok()
+    }
+
+    pub fn write_to_file(&self, path: &Path) -> Result<()> {
+        let content = toml::to_string(self)?;
+        fs::create_dir_all(path.parent().unwrap())?;
+        fs::write(path, content)?;
+        Ok(())
+    }
+
+    pub fn merge_scopes(&mut self, new_scopes: &[&str]) {
+        let existing = self.scopes.get_or_insert_with(Vec::new);
+        for scope in new_scopes {
+            if !existing.iter().any(|s| s == scope) {
+                existing.push(scope.to_string());
+            }
+        }
+    }
 }
 
 impl GlobalUser {
@@ -262,7 +289,7 @@ mod tests {
             .write(true)
             .open(&config_dir.as_path())
             .unwrap();
-        let toml_content = "refresh_token = \"some-refresh-token\"\nexpiration_time = \"2099-01-01T00:00:00Z\"\n";
+        let toml_content = "refresh_token = \"some-refresh-token\"\nexpiration_time = \"2099-01-01T00:00:00Z\"\nscopes = []\n";
         file.write_all(toml_content.as_bytes()).unwrap();
 
         let file_user = GlobalUser::from_file(config_dir);

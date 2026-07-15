@@ -7,7 +7,7 @@ use rand::Rng;
 use serde::Deserialize;
 use sha2::{Digest, Sha256};
 
-use crate::settings::global_user::get_global_config_path;
+use crate::settings::global_user::{get_global_config_path, WranglerConfig};
 
 const CLIENT_ID: &str = "54d11594-84e4-41aa-b438-e81b8fa78ee7";
 const AUTH_URL: &str = "https://dash.cloudflare.com/oauth2/auth";
@@ -72,7 +72,64 @@ fn parse_query_params(query: &str) -> HashMap<String, String> {
         .collect()
 }
 
+fn save_config(token: &TokenResponse) -> anyhow::Result<()> {
+    let config_path = get_global_config_path()?;
+
+    let mut config = WranglerConfig::read_from_file(&config_path).unwrap_or_default();
+
+    config.oauth_token = Some(token.access_token.clone());
+    if let Some(refresh) = &token.refresh_token {
+        config.refresh_token = Some(refresh.clone());
+    }
+    config.expiration_time = Some(
+        token
+            .expires_in
+            .map(|e| {
+                let exp = std::time::SystemTime::now() + std::time::Duration::from_secs(e);
+                let datetime: chrono::DateTime<chrono::Utc> = exp.into();
+                datetime.to_rfc3339()
+            })
+            .unwrap_or_else(|| "3021-12-31T23:59:59+00:00".to_string()),
+    );
+    config.merge_scopes(DNS_SCOPES);
+
+    config.write_to_file(&config_path)?;
+
+    println!(
+        "\nAuthenticated successfully! Token saved to {}",
+        config_path.display()
+    );
+    if let Some(ref scopes) = config.scopes {
+        println!("Scopes: {}", scopes.join(", "));
+    }
+
+    Ok(())
+}
+
 pub async fn auth() -> anyhow::Result<()> {
+    let config_path = get_global_config_path()?;
+
+    if let Some(existing) = WranglerConfig::read_from_file(&config_path) {
+        if let Some(refresh_token) = &existing.refresh_token {
+            if !refresh_token.trim().is_empty() {
+                println!("Found existing config with refresh token, refreshing...");
+                match refresh_access_token(refresh_token).await {
+                    Ok(token) => {
+                        save_config(&token)?;
+                        return Ok(());
+                    }
+                    Err(e) => {
+                        eprintln!("Refresh failed ({}), starting full OAuth flow...", e);
+                    }
+                }
+            }
+        }
+    }
+
+    full_oauth_flow().await
+}
+
+async fn full_oauth_flow() -> anyhow::Result<()> {
     let code_verifier = generate_pkce_verifier();
     let code_challenge = generate_pkce_challenge(&code_verifier);
     let state = generate_state();
@@ -128,39 +185,9 @@ pub async fn auth() -> anyhow::Result<()> {
             } else {
                 match exchange_code(code, &code_verifier).await {
                     Ok(token) => {
-                        let config_path = get_global_config_path()?;
-                        let config_dir = config_path.parent().unwrap();
-                        std::fs::create_dir_all(config_dir)?;
-
-                        let content = format!(
-                            "oauth_token = \"{}\"\nrefresh_token = \"{}\"\nexpiration_time = \"{}\"\nscopes = [{}]\n",
-                            token.access_token,
-                            token.refresh_token.as_deref().unwrap_or(""),
-                            token
-                                .expires_in
-                                .map(|e| {
-                                    let exp = std::time::SystemTime::now()
-                                        + std::time::Duration::from_secs(e);
-                                    let datetime: chrono::DateTime<chrono::Utc> = exp.into();
-                                    datetime.to_rfc3339()
-                                })
-                                .unwrap_or_else(|| "3021-12-31T23:59:59+00:00".to_string()),
-                            DNS_SCOPES
-                                .iter()
-                                .map(|s| format!("\"{}\"", s))
-                                .collect::<Vec<_>>()
-                                .join(", ")
-                        );
-
-                        std::fs::write(&config_path, &content)?;
-
+                        save_config(&token)?;
                         status_code = "200 OK";
                         response_body = REDIRECT_HTML_OK.to_string();
-                        println!(
-                            "\nAuthenticated successfully! Token saved to {}",
-                            config_path.display()
-                        );
-                        println!("Scopes: {}", DNS_SCOPES.join(", "));
                     }
                     Err(e) => {
                         status_code = "500 Internal Server Error";
@@ -199,6 +226,26 @@ pub async fn auth() -> anyhow::Result<()> {
     stream.write_all(response.as_bytes())?;
 
     Ok(())
+}
+
+async fn refresh_access_token(refresh_token: &str) -> anyhow::Result<TokenResponse> {
+    let client = reqwest::Client::new();
+
+    let mut params = HashMap::new();
+    params.insert("grant_type", "refresh_token");
+    params.insert("refresh_token", refresh_token);
+    params.insert("client_id", CLIENT_ID);
+
+    let resp = client
+        .post(TOKEN_URL)
+        .form(&params)
+        .send()
+        .await?
+        .error_for_status()?
+        .json::<TokenResponse>()
+        .await?;
+
+    Ok(resp)
 }
 
 async fn exchange_code(
