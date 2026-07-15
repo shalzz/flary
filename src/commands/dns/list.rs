@@ -12,11 +12,12 @@ pub fn print_records_to_writer(records: &[DnsRecord], writer: &mut dyn std::io::
         let record_type = record_type.split('{').next().unwrap_or(&record_type);
         writeln!(
             writer,
-            "{:<10} {:<24} {:<8} {}",
+            "{:<10} {:<24} {:<8} {} {}",
             record.id,
             record.name,
             record_type,
             dns_content_to_string(&record.content),
+            if record.proxied { "proxied" } else { "" },
         )?;
     }
     Ok(())

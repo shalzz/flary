@@ -4,10 +4,11 @@ use std::net::TcpListener;
 
 use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine};
 use rand::Rng;
-use serde::Deserialize;
 use sha2::{Digest, Sha256};
 
-use crate::settings::global_user::{get_global_config_path, WranglerConfig};
+use crate::settings::global_user::{
+    get_global_config_path, refresh_access_token, TokenResponse, WranglerConfig,
+};
 
 const CLIENT_ID: &str = "54d11594-84e4-41aa-b438-e81b8fa78ee7";
 const AUTH_URL: &str = "https://dash.cloudflare.com/oauth2/auth";
@@ -31,15 +32,6 @@ const REDIRECT_HTML_FAIL: &str = r#"<!DOCTYPE html>
 <h2>Authentication failed</h2>
 <p>Check the terminal for details. You may close this window.</p>
 </body></html>"#;
-
-#[derive(Deserialize)]
-struct TokenResponse {
-    access_token: String,
-    #[allow(dead_code)]
-    token_type: String,
-    expires_in: Option<u64>,
-    refresh_token: Option<String>,
-}
 
 fn generate_pkce_verifier() -> String {
     let mut rng = rand::thread_rng();
@@ -226,26 +218,6 @@ async fn full_oauth_flow() -> anyhow::Result<()> {
     stream.write_all(response.as_bytes())?;
 
     Ok(())
-}
-
-async fn refresh_access_token(refresh_token: &str) -> anyhow::Result<TokenResponse> {
-    let client = reqwest::Client::new();
-
-    let mut params = HashMap::new();
-    params.insert("grant_type", "refresh_token");
-    params.insert("refresh_token", refresh_token);
-    params.insert("client_id", CLIENT_ID);
-
-    let resp = client
-        .post(TOKEN_URL)
-        .form(&params)
-        .send()
-        .await?
-        .error_for_status()?
-        .json::<TokenResponse>()
-        .await?;
-
-    Ok(resp)
 }
 
 async fn exchange_code(

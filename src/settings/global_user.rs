@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::env;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -7,11 +8,14 @@ use serde::{Deserialize, Serialize};
 
 use crate::settings::{Environment, QueryEnvironment};
 
-const DEFAULT_CONFIG_FILE_NAME: &str = "default.toml";
+const DEFAULT_CONFIG_FILE_NAME: &str = &"default.toml";
 
 const CF_API_TOKEN: &str = "CF_API_TOKEN";
 const CF_API_KEY: &str = "CF_API_KEY";
 const CF_EMAIL: &str = "CF_EMAIL";
+
+const CLIENT_ID: &str = "54d11594-84e4-41aa-b438-e81b8fa78ee7";
+const TOKEN_URL: &str = "https://dash.cloudflare.com/oauth2/token";
 
 static ENV_VAR_WHITELIST: [&str; 3] = [CF_API_TOKEN, CF_API_KEY, CF_EMAIL];
 
@@ -33,6 +37,15 @@ pub struct WranglerConfig {
     pub refresh_token: Option<String>,
     pub expiration_time: Option<String>,
     pub scopes: Option<Vec<String>>,
+}
+
+#[derive(Deserialize)]
+pub struct TokenResponse {
+    pub access_token: String,
+    #[allow(dead_code)]
+    pub token_type: String,
+    pub expires_in: Option<u64>,
+    pub refresh_token: Option<String>,
 }
 
 impl WranglerConfig {
@@ -59,6 +72,40 @@ impl WranglerConfig {
             }
         }
     }
+
+    pub fn is_expired(&self) -> bool {
+        match &self.expiration_time {
+            None => true,
+            Some(exp) => {
+                if let Ok(exp_time) = chrono::DateTime::parse_from_rfc3339(exp) {
+                    let now = chrono::Utc::now();
+                    exp_time <= now
+                } else {
+                    true
+                }
+            }
+        }
+    }
+}
+
+pub async fn refresh_access_token(refresh_token: &str) -> Result<TokenResponse> {
+    let client = reqwest::Client::new();
+
+    let mut params = HashMap::new();
+    params.insert("grant_type", "refresh_token");
+    params.insert("refresh_token", refresh_token);
+    params.insert("client_id", CLIENT_ID);
+
+    let resp = client
+        .post(TOKEN_URL)
+        .form(&params)
+        .send()
+        .await?
+        .error_for_status()?
+        .json::<TokenResponse>()
+        .await?;
+
+    Ok(resp)
 }
 
 impl GlobalUser {
@@ -69,7 +116,7 @@ impl GlobalUser {
         GlobalUser::build(environment, config_path)
     }
 
-    fn build<T: 'static + QueryEnvironment>(environment: T, config_path: PathBuf) -> Result<Self>
+    pub fn build<T: 'static + QueryEnvironment>(environment: T, config_path: PathBuf) -> Result<Self>
     where
         T: config::Source + Send + Sync,
     {
@@ -209,6 +256,46 @@ pub fn get_global_config_path() -> Result<PathBuf> {
     let global_config_file = home_dir.join("config").join(DEFAULT_CONFIG_FILE_NAME);
     log::info!("Using global config file: {}", global_config_file.display());
     Ok(global_config_file)
+}
+
+pub async fn get_valid_user() -> Result<GlobalUser> {
+    let environment = Environment::with_whitelist(ENV_VAR_WHITELIST.to_vec());
+
+    let config_path = get_global_config_path()?;
+
+    if environment.empty().unwrap_or(true) {
+        if let Some(existing) = WranglerConfig::read_from_file(&config_path) {
+            if existing.is_expired() {
+                if let Some(refresh_token) = &existing.refresh_token {
+                    if !refresh_token.trim().is_empty() {
+                        log::info!("Token expired, attempting refresh...");
+                        match refresh_access_token(refresh_token).await {
+                            Ok(token) => {
+                                let mut config = existing;
+                                config.oauth_token = Some(token.access_token);
+                                if let Some(refresh) = &token.refresh_token {
+                                    config.refresh_token = Some(refresh.clone());
+                                }
+                                config.expiration_time = token.expires_in.map(|e| {
+                                    let exp = std::time::SystemTime::now()
+                                        + std::time::Duration::from_secs(e);
+                                    let datetime: chrono::DateTime<chrono::Utc> = exp.into();
+                                    datetime.to_rfc3339()
+                                });
+                                config.write_to_file(&config_path)?;
+                                log::info!("Token refreshed successfully");
+                            }
+                            Err(e) => {
+                                log::warn!("Token refresh failed: {}", e);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    GlobalUser::build(environment, config_path)
 }
 
 #[cfg(test)]

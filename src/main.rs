@@ -2,7 +2,7 @@
 extern crate clap;
 
 use flary::commands;
-use flary::settings;
+use flary::settings::global_user::get_valid_user;
 
 use clap::{App, Arg, SubCommand};
 use cloudflare::framework::auth::Credentials;
@@ -130,7 +130,7 @@ async fn main() -> anyhow::Result<()> {
             _ => Ok(()),
         },
         _ => {
-            let user = settings::global_user::GlobalUser::new()?;
+            let user = get_valid_user().await?;
             let client = Client::new(
                 Credentials::from(user),
                 ClientConfig::default(),
@@ -157,7 +157,7 @@ async fn main() -> anyhow::Result<()> {
                     }
                     ("add", Some(args)) => {
                         let domain = args.value_of("domain").unwrap();
-                        let name = args.value_of("name").unwrap();
+                        let record_name = args.value_of("name").unwrap();
                         let record_type = args.value_of("type").unwrap();
                         let value = args.value_of("value").unwrap();
                         let proxied = args.is_present("proxied");
@@ -169,7 +169,7 @@ async fn main() -> anyhow::Result<()> {
                         let record = flary::spinner::with_spinner("Adding DNS record", commands::dns::add::call_api(
                             &client,
                             domain,
-                            name,
+                            record_name,
                             record_type,
                             value,
                             proxied,
@@ -186,14 +186,14 @@ async fn main() -> anyhow::Result<()> {
                     ("update", Some(args)) => {
                         let id = args.value_of("id").unwrap();
                         let domain = args.value_of("domain").unwrap();
-                        let name = args.value_of("name").unwrap();
+                        let record_name = args.value_of("name").unwrap();
                         let record_type = args.value_of("type").unwrap();
                         let value = args.value_of("value").unwrap();
                         let proxied = args.is_present("proxied");
                         let ttl: u32 = args.value_of("ttl").unwrap().parse().unwrap_or(1);
 
                         let record = flary::spinner::with_spinner("Updating DNS record", commands::dns::update::call_api(
-                            &client, id, domain, name, record_type, value, proxied, ttl,
+                            &client, id, domain, record_name, record_type, value, proxied, ttl,
                         )).await?;
 
                         println!(
