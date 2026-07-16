@@ -61,6 +61,12 @@ flary config auth
 
 This opens a browser for Cloudflare consent with DNS read/write scopes (`zone:read`, `dns_records:read`, `dns_records:edit`). After authorizing, the token is saved to `~/.wrangler/config/default.toml` and is compatible with wrangler.
 
+## Shell completion
+
+```bash
+flary completions bash > ~/.local/share/bash-completion/completions/flary
+```
+
 ## Commands
 
 ```
