@@ -8,6 +8,7 @@ license = "MIT OR Apache-2.0"
 repository = "https://github.com/shalzz/flary"
 readme = "README.md"
 categories = ["command-line-interface"]
+keywords = ["cloudflare", "cli", "dns"]
 
 [dependencies]
 anyhow = "1.0.103"
