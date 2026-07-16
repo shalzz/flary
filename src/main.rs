@@ -72,10 +72,12 @@ fn build_app() -> Command {
                             Arg::new("ttl")
                                 .long("ttl")
                                 .help("TTL in seconds (1 = automatic)")
+                                .value_parser(clap::value_parser!(u32))
                                 .default_value("1"),
                             Arg::new("priority")
                                 .long("priority")
-                                .help("Priority for MX/SRV records"),
+                                .help("Priority for MX/SRV records")
+                                .value_parser(clap::value_parser!(u16)),
                         ]),
                 )
                 .subcommand(
@@ -105,6 +107,7 @@ fn build_app() -> Command {
                             Arg::new("ttl")
                                 .long("ttl")
                                 .help("TTL in seconds (1 = automatic)")
+                                .value_parser(clap::value_parser!(u32))
                                 .default_value("1"),
                         ]),
                 )
@@ -202,10 +205,8 @@ async fn main() -> anyhow::Result<()> {
                         let record_type = args.get_one::<String>("type").unwrap();
                         let value = args.get_one::<String>("value").unwrap();
                         let proxied = args.get_flag("proxied");
-                        let ttl: u32 = args.get_one::<String>("ttl").unwrap().parse().unwrap_or(1);
-                        let priority: Option<u16> = args
-                            .get_one::<String>("priority")
-                            .and_then(|p| p.parse().ok());
+                        let ttl: u32 = *args.get_one::<u32>("ttl").unwrap_or(&1);
+                        let priority: Option<u16> = args.get_one::<u16>("priority").copied();
 
                         let record = flary::spinner::with_spinner(
                             "Adding DNS record",
@@ -235,7 +236,7 @@ async fn main() -> anyhow::Result<()> {
                         let record_type = args.get_one::<String>("type").unwrap();
                         let value = args.get_one::<String>("value").unwrap();
                         let proxied = args.get_flag("proxied");
-                        let ttl: u32 = args.get_one::<String>("ttl").unwrap().parse().unwrap_or(1);
+                        let ttl: u32 = *args.get_one::<u32>("ttl").unwrap_or(&1);
 
                         let record = flary::spinner::with_spinner(
                             "Updating DNS record",
