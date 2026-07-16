@@ -26,7 +26,7 @@ async fn test_update_a_record_success() {
 
     let client = common::create_mock_client(&server).await;
 
-    let result = update(&client, "rec_abc", "example.com", "www", "A", "5.6.7.8", false, 1).await;
+    let result = update(&client, "example.com", "rec_abc", "www", "A", "5.6.7.8", false, 1).await;
     assert!(result.is_ok());
 
     server.verify().await;
@@ -52,7 +52,7 @@ async fn test_update_a_record_proxied() {
 
     let client = common::create_mock_client(&server).await;
 
-    let result = update(&client, "rec_abc", "example.com", "www", "A", "5.6.7.8", true, 300).await;
+    let result = update(&client, "example.com", "rec_abc", "www", "A", "5.6.7.8", true, 300).await;
     assert!(result.is_ok());
 
     server.verify().await;
@@ -78,7 +78,7 @@ async fn test_update_cname_record() {
 
     let client = common::create_mock_client(&server).await;
 
-    let result = update(&client, "rec_cn", "example.com", "blog", "CNAME", "newtarget.example.com", false, 1).await;
+    let result = update(&client, "example.com", "rec_cn", "blog", "CNAME", "newtarget.example.com", false, 1).await;
     assert!(result.is_ok());
 
     server.verify().await;
@@ -96,7 +96,7 @@ async fn test_update_domain_not_found() {
 
     let client = common::create_mock_client(&server).await;
 
-    let result = update(&client, "rec_abc", "nonexistent.com", "www", "A", "1.2.3.4", false, 1).await;
+    let result = update(&client, "nonexistent.com", "rec_abc", "www", "A", "1.2.3.4", false, 1).await;
     assert!(result.is_err());
     assert!(result.unwrap_err().to_string().contains("not found"));
 
@@ -123,7 +123,7 @@ async fn test_update_record_not_found() {
 
     let client = common::create_mock_client(&server).await;
 
-    let result = update(&client, "nonexistent", "example.com", "www", "A", "1.2.3.4", false, 1).await;
+    let result = update(&client, "example.com", "nonexistent", "www", "A", "1.2.3.4", false, 1).await;
     assert!(result.is_err());
 
     server.verify().await;
@@ -149,7 +149,7 @@ async fn test_update_api_error() {
 
     let client = common::create_mock_client(&server).await;
 
-    let result = update(&client, "rec_abc", "example.com", "www", "INVALID", "1.2.3.4", false, 1).await;
+    let result = update(&client, "example.com", "rec_abc", "www", "INVALID", "1.2.3.4", false, 1).await;
     assert!(result.is_err());
 
     server.verify().await;

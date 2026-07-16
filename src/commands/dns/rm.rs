@@ -3,7 +3,7 @@ use cloudflare::framework::client::async_api::Client;
 
 use crate::commands;
 
-pub async fn rm(client: &Client, id: &str, domain: &str, yes: bool) -> anyhow::Result<()> {
+pub async fn rm(client: &Client, domain: &str, id: &str, yes: bool) -> anyhow::Result<()> {
     let zones = commands::domains::list::call_api(client, Some(domain.to_owned())).await?;
 
     if zones.is_empty() {

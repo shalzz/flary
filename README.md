@@ -74,8 +74,8 @@ flary config auth                  # Authenticate via OAuth
 flary domains ls                   # List all domains
 flary dns ls <domain>              # List DNS records for a domain
 flary dns add <domain> <name> <type> <value> [--proxied] [--ttl N] [--priority N]
-flary dns update <id> <domain> <name> <type> <value> [--proxied] [--ttl N]
-flary dns rm <id> <domain> [--yes]
+flary dns update <domain> <id> <name> <type> <value> [--proxied] [--ttl N]
+flary dns rm <domain> <id> [--yes]
 ```
 
 ### DNS record types
@@ -148,7 +148,7 @@ flary dns add example.com @ TXT "v=spf1 include:_spf.google.com ~all"
 ### Update a DNS record
 
 ```bash
-flary dns update <id> <domain> <name> <type> <value> [OPTIONS]
+flary dns update <domain> <id> <name> <type> <value> [OPTIONS]
 ```
 
 Requires the record ID (obtainable from `dns ls`). The `--proxied` and `--ttl` flags work the same as `dns add`.
@@ -158,19 +158,19 @@ Requires the record ID (obtainable from `dns ls`). The `--proxied` and `--ttl` f
 Update an A record's IP address:
 
 ```bash
-flary dns update abc123 example.com www A 192.0.2.2
+flary dns update example.com abc123 www A 192.0.2.2
 ```
 
 Update and enable proxying:
 
 ```bash
-flary dns update abc123 example.com www A 192.0.2.2 --proxied --ttl 300
+flary dns update example.com abc123 www A 192.0.2.2 --proxied --ttl 300
 ```
 
 ### Remove a DNS record
 
 ```bash
-flary dns rm <id> <domain> [OPTIONS]
+flary dns rm <domain> <id> [OPTIONS]
 ```
 
 Prompts for confirmation before deleting. Use `--yes` to skip the prompt.
@@ -180,13 +180,13 @@ Prompts for confirmation before deleting. Use `--yes` to skip the prompt.
 Interactive delete:
 
 ```bash
-flary dns rm abc123 example.com
+flary dns rm example.com abc123
 ```
 
 Skip confirmation:
 
 ```bash
-flary dns rm abc123 example.com --yes
+flary dns rm example.com abc123 --yes
 ```
 
 ## Development

@@ -5,8 +5,8 @@ use crate::commands;
 
 pub async fn call_api(
     client: &Client,
-    id: &str,
     domain: &str,
+    id: &str,
     name: &str,
     record_type: &str,
     value: &str,
@@ -41,15 +41,15 @@ pub async fn call_api(
 
 pub async fn update(
     client: &Client,
-    id: &str,
     domain: &str,
+    id: &str,
     name: &str,
     record_type: &str,
     value: &str,
     proxied: bool,
     ttl: u32,
 ) -> anyhow::Result<()> {
-    let record = call_api(client, id, domain, name, record_type, value, proxied, ttl).await?;
+    let record = call_api(client, domain, id, name, record_type, value, proxied, ttl).await?;
 
     println!(
         "Updated DNS record: {} {} {} (ID: {})",

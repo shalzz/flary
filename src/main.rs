@@ -230,8 +230,8 @@ async fn main() -> anyhow::Result<()> {
                         Ok(())
                     }
                     Some(("update", args)) => {
-                        let id = args.get_one::<String>("id").unwrap();
                         let domain = args.get_one::<String>("domain").unwrap();
+                        let id = args.get_one::<String>("id").unwrap();
                         let record_name = args.get_one::<String>("name").unwrap();
                         let record_type = args.get_one::<String>("type").unwrap();
                         let value = args.get_one::<String>("value").unwrap();
@@ -242,8 +242,8 @@ async fn main() -> anyhow::Result<()> {
                             "Updating DNS record",
                             commands::dns::update::call_api(
                                 &client,
-                                id,
                                 domain,
+                                id,
                                 record_name,
                                 record_type,
                                 value,
@@ -260,11 +260,11 @@ async fn main() -> anyhow::Result<()> {
                         Ok(())
                     }
                     Some(("rm", args)) => {
-                        let id = args.get_one::<String>("id").unwrap();
                         let domain = args.get_one::<String>("domain").unwrap();
+                        let id = args.get_one::<String>("id").unwrap();
                         let yes = args.get_flag("yes");
 
-                        commands::dns::rm(&client, id, domain, yes).await
+                        commands::dns::rm(&client, domain, id, yes).await
                     }
                     _ => Ok(()),
                 },

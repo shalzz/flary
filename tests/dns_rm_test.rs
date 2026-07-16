@@ -37,7 +37,7 @@ async fn test_rm_record_with_yes_flag() {
 
     let client = common::create_mock_client(&server).await;
 
-    let result = rm(&client, "rec_abc", "example.com", true).await;
+    let result = rm(&client, "example.com", "rec_abc", true).await;
     assert!(result.is_ok());
 
     server.verify().await;
@@ -55,7 +55,7 @@ async fn test_rm_record_domain_not_found() {
 
     let client = common::create_mock_client(&server).await;
 
-    let result = rm(&client, "rec_abc", "nonexistent.com", true).await;
+    let result = rm(&client, "nonexistent.com", "rec_abc", true).await;
     assert!(result.is_err());
     assert!(result.unwrap_err().to_string().contains("not found"));
 
@@ -80,7 +80,7 @@ async fn test_rm_record_not_found_in_zone() {
 
     let client = common::create_mock_client(&server).await;
 
-    let result = rm(&client, "nonexistent", "example.com", true).await;
+    let result = rm(&client, "example.com", "nonexistent", true).await;
     assert!(result.is_err());
     assert!(result.unwrap_err().to_string().contains("not found"));
 
@@ -107,7 +107,7 @@ async fn test_rm_record_list_api_error() {
 
     let client = common::create_mock_client(&server).await;
 
-    let result = rm(&client, "rec_abc", "example.com", true).await;
+    let result = rm(&client, "example.com", "rec_abc", true).await;
     assert!(result.is_err());
 
     server.verify().await;
@@ -143,7 +143,7 @@ async fn test_rm_record_delete_api_error() {
 
     let client = common::create_mock_client(&server).await;
 
-    let result = rm(&client, "rec_abc", "example.com", true).await;
+    let result = rm(&client, "example.com", "rec_abc", true).await;
     assert!(result.is_err());
 
     server.verify().await;
