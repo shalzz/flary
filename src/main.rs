@@ -1,23 +1,24 @@
 #[macro_use]
 extern crate clap;
 
+use std::io::stdout;
+
+use clap::{App, AppSettings, Arg, Shell, SubCommand};
+
 use flary::commands;
 use flary::settings::global_user::get_valid_user;
 
-use clap::{App, Arg, SubCommand};
 use cloudflare::framework::auth::Credentials;
 use cloudflare::framework::client::async_api::Client;
 use cloudflare::framework::client::ClientConfig;
 use cloudflare::framework::Environment;
 
-#[tokio::main]
-async fn main() -> anyhow::Result<()> {
-    env_logger::init();
-
-    let app = App::new(crate_name!())
+fn build_app() -> App<'static, 'static> {
+    App::new(crate_name!())
         .version(crate_version!())
         .author(crate_authors!())
         .about("Manage Cloudflare domains and DNS records")
+        .setting(AppSettings::SubcommandRequiredElseHelp)
         .subcommand(
             SubCommand::with_name("config")
                 .about("Manage authentication configuration")
@@ -125,13 +126,43 @@ async fn main() -> anyhow::Result<()> {
                         ]),
                 ]),
         )
-        .get_matches();
+        .subcommand(
+            SubCommand::with_name("completions")
+                .about("Generate shell completion scripts")
+                .arg(
+                    Arg::with_name("shell")
+                        .help("Shell type")
+                        .required(true)
+                        .possible_values(&["bash", "zsh", "fish", "powershell", "elvish"]),
+                ),
+        )
+}
 
-    match app.subcommand() {
+#[tokio::main]
+async fn main() -> anyhow::Result<()> {
+    env_logger::init();
+
+    let app = build_app();
+    let matches = app.get_matches();
+
+    match matches.subcommand() {
         ("config", Some(subs)) => match subs.subcommand_name() {
             Some("auth") => commands::config::auth::auth().await,
             _ => Ok(()),
         },
+        ("completions", Some(subs)) => {
+            let shell = subs.value_of("shell").unwrap();
+            let shell = match shell {
+                "bash" => Shell::Bash,
+                "zsh" => Shell::Zsh,
+                "fish" => Shell::Fish,
+                "powershell" => Shell::PowerShell,
+                "elvish" => Shell::Elvish,
+                _ => anyhow::bail!("unsupported shell: {}", shell),
+            };
+            build_app().gen_completions_to(crate_name!(), shell, &mut stdout());
+            Ok(())
+        }
         _ => {
             let user = get_valid_user().await?;
             let client = Client::new(
@@ -140,7 +171,7 @@ async fn main() -> anyhow::Result<()> {
                 Environment::Production,
             )?;
 
-            match app.subcommand() {
+            match matches.subcommand() {
                 ("domains", Some(subs)) => match subs.subcommand_name() {
                     Some("ls") => {
                         let zones = flary::spinner::with_spinner("Fetching domains", commands::domains::list::call_api(&client, None)).await?;
