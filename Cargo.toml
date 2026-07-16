@@ -1,6 +1,6 @@
 [package]
 name = "flary"
-version = "1.0.3"
+version = "1.0.4"
 authors = ["Shaleen Jain <shaleen@jain.sh>"]
 edition = "2018"
 description = "A CLI for managing Domains and DNS records on cloudflare."
