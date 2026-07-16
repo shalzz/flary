@@ -85,11 +85,11 @@ fn build_app() -> Command {
                         .about("Update a DNS record")
                         .long_about("Update an existing DNS record by ID.\nUse `dns ls` to find the record ID.")
                         .args(&[
-                            Arg::new("id")
-                                .help("DNS record ID to update")
-                                .required(true),
                             Arg::new("domain")
                                 .help("Domain the record belongs to")
+                                .required(true),
+                            Arg::new("id")
+                                .help("DNS record ID to update")
                                 .required(true),
                             Arg::new("name")
                                 .help("Record name (e.g. www, @, mail)")
@@ -117,11 +117,11 @@ fn build_app() -> Command {
                         .about("Remove a DNS record")
                         .long_about("Remove a DNS record by ID.\nUse `dns ls` to find the record ID.")
                         .args(&[
-                            Arg::new("id")
-                                .help("DNS record ID to remove")
-                                .required(true),
                             Arg::new("domain")
                                 .help("Domain the record belongs to")
+                                .required(true),
+                            Arg::new("id")
+                                .help("DNS record ID to remove")
                                 .required(true),
                             Arg::new("yes")
                                 .long("yes")
