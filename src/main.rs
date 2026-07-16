@@ -17,19 +17,19 @@ async fn main() -> anyhow::Result<()> {
     let app = App::new(crate_name!())
         .version(crate_version!())
         .author(crate_authors!())
-        .about(crate_description!())
+        .about("Manage Cloudflare domains and DNS records")
         .subcommand(
             SubCommand::with_name("config")
-                .about("Configure flary settings")
+                .about("Manage authentication configuration")
                 .subcommands(vec![
                     SubCommand::with_name("auth")
-                        .about("Re-authorize the wrangler OAuth token with DNS permissions"),
+                        .about("Authenticate with Cloudflare via OAuth (DNS read/write scopes)"),
                 ]),
         )
         .subcommand(
             SubCommand::with_name("domains")
                 .alias("domain")
-                .about("Manage your domain names")
+                .about("Manage Cloudflare domains/zones")
                 .subcommands(vec![
                     SubCommand::with_name("ls")
                         .alias("list")
@@ -38,38 +38,39 @@ async fn main() -> anyhow::Result<()> {
         )
         .subcommand(
             SubCommand::with_name("dns")
-                .about("Manage your DNS records")
+                .about("Manage DNS records for a domain")
                 .subcommands(vec![
                     SubCommand::with_name("ls")
                         .alias("list")
-                        .about("List all DNS records of a domain")
+                        .about("List DNS records for a domain")
                         .arg(
                             Arg::with_name("name")
-                                .help("Name of the domain")
+                                .help("Domain name")
                                 .required(true),
                         ),
                     SubCommand::with_name("add")
-                        .about("Add a DNS record to a domain")
+                        .about("Add a DNS record")
+                        .long_about("Add a DNS record to a domain.\nSupported record types: A, AAAA, CNAME, TXT, MX, SRV, NS")
                         .args(&[
                             Arg::with_name("domain")
-                                .help("Domain name to add the record to")
+                                .help("Domain to add the record to")
                                 .required(true),
                             Arg::with_name("name")
-                                .help("DNS record name (e.g. 'www', '@' for root)")
+                                .help("Record name (e.g. www, @, mail)")
                                 .required(true),
                             Arg::with_name("type")
-                                .help("Type of DNS record (A, AAAA, CNAME, TXT, MX, SRV, NS)")
+                                .help("Record type (A, AAAA, CNAME, TXT, MX, SRV, NS)")
                                 .required(true),
                             Arg::with_name("value")
-                                .help("Value of the DNS record")
+                                .help("Record value (IP, hostname, or text)")
                                 .required(true),
                             Arg::with_name("proxied")
                                 .long("proxied")
-                                .help("Whether the record is proxied through Cloudflare")
+                                .help("Proxy through Cloudflare (orange cloud)")
                                 .takes_value(false),
                             Arg::with_name("ttl")
                                 .long("ttl")
-                                .help("Time to live in seconds (1 = automatic)")
+                                .help("TTL in seconds (1 = automatic)")
                                 .takes_value(true)
                                 .default_value("1"),
                             Arg::with_name("priority")
@@ -78,42 +79,44 @@ async fn main() -> anyhow::Result<()> {
                                 .takes_value(true),
                         ]),
                     SubCommand::with_name("update")
-                        .about("Update an existing DNS record")
+                        .about("Update a DNS record")
+                        .long_about("Update an existing DNS record by ID.\nUse `dns ls` to find the record ID.")
                         .args(&[
                             Arg::with_name("id")
-                                .help("ID of the DNS record to update")
+                                .help("DNS record ID to update")
                                 .required(true),
                             Arg::with_name("domain")
-                                .help("Domain name the record belongs to")
+                                .help("Domain the record belongs to")
                                 .required(true),
                             Arg::with_name("name")
-                                .help("DNS record name (e.g. 'www', '@' for root)")
+                                .help("Record name (e.g. www, @, mail)")
                                 .required(true),
                             Arg::with_name("type")
-                                .help("Type of DNS record (A, AAAA, CNAME, TXT, MX, SRV, NS)")
+                                .help("Record type (A, AAAA, CNAME, TXT, MX, SRV, NS)")
                                 .required(true),
                             Arg::with_name("value")
-                                .help("Value of the DNS record")
+                                .help("Record value (IP, hostname, or text)")
                                 .required(true),
                             Arg::with_name("proxied")
                                 .long("proxied")
-                                .help("Whether the record is proxied through Cloudflare")
+                                .help("Proxy through Cloudflare (orange cloud)")
                                 .takes_value(false),
                             Arg::with_name("ttl")
                                 .long("ttl")
-                                .help("Time to live in seconds (1 = automatic)")
+                                .help("TTL in seconds (1 = automatic)")
                                 .takes_value(true)
                                 .default_value("1"),
                         ]),
                     SubCommand::with_name("rm")
                         .alias("remove")
                         .about("Remove a DNS record")
+                        .long_about("Remove a DNS record by ID.\nUse `dns ls` to find the record ID.")
                         .args(&[
                             Arg::with_name("id")
-                                .help("ID of the DNS record to remove")
+                                .help("DNS record ID to remove")
                                 .required(true),
                             Arg::with_name("domain")
-                                .help("Domain name the record belongs to")
+                                .help("Domain the record belongs to")
                                 .required(true),
                             Arg::with_name("yes")
                                 .long("yes")
