@@ -1,9 +1,5 @@
-#[macro_use]
-extern crate clap;
-
-use std::io::stdout;
-
-use clap::{App, AppSettings, Arg, Shell, SubCommand};
+use clap::{Arg, ArgAction, Command};
+use clap_complete::{generate, Shell};
 
 use flary::commands;
 use flary::settings::global_user::get_valid_user;
@@ -13,127 +9,133 @@ use cloudflare::framework::client::async_api::Client;
 use cloudflare::framework::client::ClientConfig;
 use cloudflare::framework::Environment;
 
-fn build_app() -> App<'static, 'static> {
-    App::new(crate_name!())
-        .version(crate_version!())
-        .author(crate_authors!())
+fn build_app() -> Command {
+    Command::new(env!("CARGO_PKG_NAME"))
+        .version(env!("CARGO_PKG_VERSION"))
+        .author(env!("CARGO_PKG_AUTHORS"))
         .about("Manage Cloudflare domains and DNS records")
-        .setting(AppSettings::SubcommandRequiredElseHelp)
+        .arg_required_else_help(true)
         .subcommand(
-            SubCommand::with_name("config")
+            Command::new("config")
                 .about("Manage authentication configuration")
-                .subcommands(vec![
-                    SubCommand::with_name("auth")
+                .subcommand(
+                    Command::new("auth")
                         .about("Authenticate with Cloudflare via OAuth (DNS read/write scopes)"),
-                ]),
+                ),
         )
         .subcommand(
-            SubCommand::with_name("domains")
+            Command::new("domains")
                 .alias("domain")
                 .about("Manage Cloudflare domains/zones")
-                .subcommands(vec![
-                    SubCommand::with_name("ls")
+                .arg_required_else_help(true)
+                .subcommand(
+                    Command::new("ls")
                         .alias("list")
                         .about("List all domains"),
-                ]),
+                ),
         )
         .subcommand(
-            SubCommand::with_name("dns")
+            Command::new("dns")
                 .about("Manage DNS records for a domain")
-                .subcommands(vec![
-                    SubCommand::with_name("ls")
+                .arg_required_else_help(true)
+                .subcommand(
+                    Command::new("ls")
                         .alias("list")
                         .about("List DNS records for a domain")
                         .arg(
-                            Arg::with_name("name")
+                            Arg::new("name")
                                 .help("Domain name")
                                 .required(true),
                         ),
-                    SubCommand::with_name("add")
+                )
+                .subcommand(
+                    Command::new("add")
                         .about("Add a DNS record")
                         .long_about("Add a DNS record to a domain.\nSupported record types: A, AAAA, CNAME, TXT, MX, SRV, NS")
                         .args(&[
-                            Arg::with_name("domain")
+                            Arg::new("domain")
                                 .help("Domain to add the record to")
                                 .required(true),
-                            Arg::with_name("name")
+                            Arg::new("name")
                                 .help("Record name (e.g. www, @, mail)")
                                 .required(true),
-                            Arg::with_name("type")
+                            Arg::new("type")
                                 .help("Record type (A, AAAA, CNAME, TXT, MX, SRV, NS)")
                                 .required(true),
-                            Arg::with_name("value")
+                            Arg::new("value")
                                 .help("Record value (IP, hostname, or text)")
                                 .required(true),
-                            Arg::with_name("proxied")
+                            Arg::new("proxied")
                                 .long("proxied")
                                 .help("Proxy through Cloudflare (orange cloud)")
-                                .takes_value(false),
-                            Arg::with_name("ttl")
+                                .action(ArgAction::SetTrue),
+                            Arg::new("ttl")
                                 .long("ttl")
                                 .help("TTL in seconds (1 = automatic)")
-                                .takes_value(true)
                                 .default_value("1"),
-                            Arg::with_name("priority")
+                            Arg::new("priority")
                                 .long("priority")
-                                .help("Priority for MX/SRV records")
-                                .takes_value(true),
+                                .help("Priority for MX/SRV records"),
                         ]),
-                    SubCommand::with_name("update")
+                )
+                .subcommand(
+                    Command::new("update")
                         .about("Update a DNS record")
                         .long_about("Update an existing DNS record by ID.\nUse `dns ls` to find the record ID.")
                         .args(&[
-                            Arg::with_name("id")
+                            Arg::new("id")
                                 .help("DNS record ID to update")
                                 .required(true),
-                            Arg::with_name("domain")
+                            Arg::new("domain")
                                 .help("Domain the record belongs to")
                                 .required(true),
-                            Arg::with_name("name")
+                            Arg::new("name")
                                 .help("Record name (e.g. www, @, mail)")
                                 .required(true),
-                            Arg::with_name("type")
+                            Arg::new("type")
                                 .help("Record type (A, AAAA, CNAME, TXT, MX, SRV, NS)")
                                 .required(true),
-                            Arg::with_name("value")
+                            Arg::new("value")
                                 .help("Record value (IP, hostname, or text)")
                                 .required(true),
-                            Arg::with_name("proxied")
+                            Arg::new("proxied")
                                 .long("proxied")
                                 .help("Proxy through Cloudflare (orange cloud)")
-                                .takes_value(false),
-                            Arg::with_name("ttl")
+                                .action(ArgAction::SetTrue),
+                            Arg::new("ttl")
                                 .long("ttl")
                                 .help("TTL in seconds (1 = automatic)")
-                                .takes_value(true)
                                 .default_value("1"),
                         ]),
-                    SubCommand::with_name("rm")
+                )
+                .subcommand(
+                    Command::new("rm")
                         .alias("remove")
                         .about("Remove a DNS record")
                         .long_about("Remove a DNS record by ID.\nUse `dns ls` to find the record ID.")
                         .args(&[
-                            Arg::with_name("id")
+                            Arg::new("id")
                                 .help("DNS record ID to remove")
                                 .required(true),
-                            Arg::with_name("domain")
+                            Arg::new("domain")
                                 .help("Domain the record belongs to")
                                 .required(true),
-                            Arg::with_name("yes")
+                            Arg::new("yes")
                                 .long("yes")
                                 .help("Skip confirmation prompt")
-                                .takes_value(false),
+                                .action(ArgAction::SetTrue),
                         ]),
-                ]),
+                ),
         )
         .subcommand(
-            SubCommand::with_name("completions")
+            Command::new("completions")
                 .about("Generate shell completion scripts")
+                .arg_required_else_help(true)
                 .arg(
-                    Arg::with_name("shell")
+                    Arg::new("shell")
                         .help("Shell type")
                         .required(true)
-                        .possible_values(&["bash", "zsh", "fish", "powershell", "elvish"]),
+                        .value_parser(["bash", "zsh", "fish", "powershell", "elvish"]),
                 ),
         )
 }
@@ -142,25 +144,29 @@ fn build_app() -> App<'static, 'static> {
 async fn main() -> anyhow::Result<()> {
     env_logger::init();
 
-    let app = build_app();
-    let matches = app.get_matches();
+    let matches = build_app().get_matches();
 
     match matches.subcommand() {
-        ("config", Some(subs)) => match subs.subcommand_name() {
-            Some("auth") => commands::config::auth::auth().await,
+        Some(("config", subs)) => match subs.subcommand() {
+            Some(("auth", _)) => commands::config::auth::auth().await,
             _ => Ok(()),
         },
-        ("completions", Some(subs)) => {
-            let shell = subs.value_of("shell").unwrap();
-            let shell = match shell {
+        Some(("completions", subs)) => {
+            let shell = match subs.get_one::<String>("shell").unwrap().as_str() {
                 "bash" => Shell::Bash,
                 "zsh" => Shell::Zsh,
                 "fish" => Shell::Fish,
                 "powershell" => Shell::PowerShell,
                 "elvish" => Shell::Elvish,
-                _ => anyhow::bail!("unsupported shell: {}", shell),
+                _ => unreachable!(),
             };
-            build_app().gen_completions_to(crate_name!(), shell, &mut stdout());
+            let mut cmd = build_app();
+            generate(
+                shell,
+                &mut cmd,
+                env!("CARGO_PKG_NAME"),
+                &mut std::io::stdout(),
+            );
             Ok(())
         }
         _ => {
@@ -172,9 +178,13 @@ async fn main() -> anyhow::Result<()> {
             )?;
 
             match matches.subcommand() {
-                ("domains", Some(subs)) => match subs.subcommand_name() {
-                    Some("ls") => {
-                        let zones = flary::spinner::with_spinner("Fetching domains", commands::domains::list::call_api(&client, None)).await?;
+                Some(("domains", subs)) => match subs.subcommand() {
+                    Some(("ls", _)) => {
+                        let zones = flary::spinner::with_spinner(
+                            "Fetching domains",
+                            commands::domains::list::call_api(&client, None),
+                        )
+                        .await?;
                         for zone in &zones {
                             println!("{}", &zone.name);
                         }
@@ -182,34 +192,42 @@ async fn main() -> anyhow::Result<()> {
                     }
                     _ => Ok(()),
                 },
-                ("dns", Some(subs)) => match subs.subcommand() {
-                    ("ls", Some(args)) => {
-                        let name = args.value_of("name").unwrap();
-                        let records = flary::spinner::with_spinner("Fetching DNS records", commands::dns::list::call_api(&client, name)).await?;
+                Some(("dns", subs)) => match subs.subcommand() {
+                    Some(("ls", args)) => {
+                        let name = args.get_one::<String>("name").unwrap();
+                        let records = flary::spinner::with_spinner(
+                            "Fetching DNS records",
+                            commands::dns::list::call_api(&client, name),
+                        )
+                        .await?;
                         commands::dns::list::print_records(&records);
                         Ok(())
                     }
-                    ("add", Some(args)) => {
-                        let domain = args.value_of("domain").unwrap();
-                        let record_name = args.value_of("name").unwrap();
-                        let record_type = args.value_of("type").unwrap();
-                        let value = args.value_of("value").unwrap();
-                        let proxied = args.is_present("proxied");
-                        let ttl: u32 = args.value_of("ttl").unwrap().parse().unwrap_or(1);
+                    Some(("add", args)) => {
+                        let domain = args.get_one::<String>("domain").unwrap();
+                        let record_name = args.get_one::<String>("name").unwrap();
+                        let record_type = args.get_one::<String>("type").unwrap();
+                        let value = args.get_one::<String>("value").unwrap();
+                        let proxied = args.get_flag("proxied");
+                        let ttl: u32 = args.get_one::<String>("ttl").unwrap().parse().unwrap_or(1);
                         let priority: Option<u16> = args
-                            .value_of("priority")
+                            .get_one::<String>("priority")
                             .and_then(|p| p.parse().ok());
 
-                        let record = flary::spinner::with_spinner("Adding DNS record", commands::dns::add::call_api(
-                            &client,
-                            domain,
-                            record_name,
-                            record_type,
-                            value,
-                            proxied,
-                            ttl,
-                            priority,
-                        )).await?;
+                        let record = flary::spinner::with_spinner(
+                            "Adding DNS record",
+                            commands::dns::add::call_api(
+                                &client,
+                                domain,
+                                record_name,
+                                record_type,
+                                value,
+                                proxied,
+                                ttl,
+                                priority,
+                            ),
+                        )
+                        .await?;
 
                         println!(
                             "Created DNS record: {} {} {} (ID: {})",
@@ -217,18 +235,29 @@ async fn main() -> anyhow::Result<()> {
                         );
                         Ok(())
                     }
-                    ("update", Some(args)) => {
-                        let id = args.value_of("id").unwrap();
-                        let domain = args.value_of("domain").unwrap();
-                        let record_name = args.value_of("name").unwrap();
-                        let record_type = args.value_of("type").unwrap();
-                        let value = args.value_of("value").unwrap();
-                        let proxied = args.is_present("proxied");
-                        let ttl: u32 = args.value_of("ttl").unwrap().parse().unwrap_or(1);
+                    Some(("update", args)) => {
+                        let id = args.get_one::<String>("id").unwrap();
+                        let domain = args.get_one::<String>("domain").unwrap();
+                        let record_name = args.get_one::<String>("name").unwrap();
+                        let record_type = args.get_one::<String>("type").unwrap();
+                        let value = args.get_one::<String>("value").unwrap();
+                        let proxied = args.get_flag("proxied");
+                        let ttl: u32 = args.get_one::<String>("ttl").unwrap().parse().unwrap_or(1);
 
-                        let record = flary::spinner::with_spinner("Updating DNS record", commands::dns::update::call_api(
-                            &client, id, domain, record_name, record_type, value, proxied, ttl,
-                        )).await?;
+                        let record = flary::spinner::with_spinner(
+                            "Updating DNS record",
+                            commands::dns::update::call_api(
+                                &client,
+                                id,
+                                domain,
+                                record_name,
+                                record_type,
+                                value,
+                                proxied,
+                                ttl,
+                            ),
+                        )
+                        .await?;
 
                         println!(
                             "Updated DNS record: {} {} {} (ID: {})",
@@ -236,10 +265,10 @@ async fn main() -> anyhow::Result<()> {
                         );
                         Ok(())
                     }
-                    ("rm", Some(args)) => {
-                        let id = args.value_of("id").unwrap();
-                        let domain = args.value_of("domain").unwrap();
-                        let yes = args.is_present("yes");
+                    Some(("rm", args)) => {
+                        let id = args.get_one::<String>("id").unwrap();
+                        let domain = args.get_one::<String>("domain").unwrap();
+                        let yes = args.get_flag("yes");
 
                         commands::dns::rm(&client, id, domain, yes).await
                     }
