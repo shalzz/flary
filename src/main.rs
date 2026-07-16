@@ -135,7 +135,7 @@ fn build_app() -> Command {
                     Arg::new("shell")
                         .help("Shell type")
                         .required(true)
-                        .value_parser(["bash", "zsh", "fish", "powershell", "elvish"]),
+                        .value_parser(clap::value_parser!(Shell)),
                 ),
         )
 }
@@ -152,14 +152,7 @@ async fn main() -> anyhow::Result<()> {
             _ => Ok(()),
         },
         Some(("completions", subs)) => {
-            let shell = match subs.get_one::<String>("shell").unwrap().as_str() {
-                "bash" => Shell::Bash,
-                "zsh" => Shell::Zsh,
-                "fish" => Shell::Fish,
-                "powershell" => Shell::PowerShell,
-                "elvish" => Shell::Elvish,
-                _ => unreachable!(),
-            };
+            let shell = *subs.get_one::<Shell>("shell").unwrap();
             let mut cmd = build_app();
             generate(
                 shell,
